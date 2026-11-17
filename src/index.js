@@ -62,10 +62,16 @@ async function coletarCandidatos(config) {
 
   // 2) Produtos de cada loja (mais vendidos + maior desconto/relevância)
   for (const [shopId, nome] of lojasOk) {
+    let total = 0, nomeShopee = '';
     for (const ordem of [2, 1]) {
-      try { considerar(await buscarProdutos({ shopId, ordem, limite: f.candidatosPorLoja })); }
-      catch (e) { console.log(`⚠️  ${nome}: ${e.message}`); }
+      try {
+        const lista = await buscarProdutos({ shopId, ordem, limite: f.candidatosPorLoja });
+        total += lista.length;
+        nomeShopee ||= lista[0]?.shopName || '';
+        considerar(lista);
+      } catch (e) { console.log(`⚠️  ${nome}: ${e.message}`); }
     }
+    console.log(`🏪 ${nome}: ${total} produtos${nomeShopee ? ` (na Shopee: "${nomeShopee}")` : ''}`);
   }
   // 3) Palavras-chave (resultado filtrado para as lojas autorizadas)
   for (const palavra of config.palavrasChave || []) {

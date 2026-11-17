@@ -1,23 +1,44 @@
 {
   "grupoRascunhos": "Crônicas da Milla",
-
-  "horarios": ["10:00", "19:00"],
-
-  "lojas": [
-    { "nome": "Koksara",        "link": "https://shopee.com.br/koksara.br" },
-    { "nome": "Glory Of Seoul", "link": "" },
-    { "nome": "Jadoo",          "link": "https://shopee.com.br/ddosong2kv.br" },
-    { "nome": "Younfamily",     "link": "https://shopee.com.br/younfamily.br" },
-    { "nome": "Likeitlikeit",   "link": "" },
-    { "nome": "Jolse",          "link": "https://shopee.com.br/jolse.br" },
-    { "nome": "Soul of Seoul",  "link": "https://shopee.com.br/sosbeautybr.br" }
+  "horarios": [
+    "10:00",
+    "19:00"
   ],
-
-  "palavrasChave": ["glory of seoul"],
-
+  "lojas": [
+    {
+      "nome": "Koksara",
+      "link": "https://shopee.com.br/koksara.br"
+    },
+    {
+      "nome": "Glory Of Seoul",
+      "link": ""
+    },
+    {
+      "nome": "Jadoo",
+      "link": "https://shopee.com.br/Renewal-MediCube-Zero-Pore-Pad-2.0-70-(Com-Caixa)-i.1339412998.28509010612"
+    },
+    {
+      "nome": "Younfamily",
+      "link": "https://shopee.com.br/younfamily.br"
+    },
+    {
+      "nome": "Likeitlikeit",
+      "link": "https://shopee.com.br/-SENKA-senka-Perfect-Whip-Facial-Wash-Whip-White-Clay-VitC-Poreless-Glow-Shipping-from-Korea-Korea-Beauty-i.726091628.24972191914"
+    },
+    {
+      "nome": "Jolse",
+      "link": "https://shopee.com.br/celimax-The-VITA-A-Retinal-Shot-Refor%C3%A7o-Apertador-15ml-i.432270355.27320211661"
+    },
+    {
+      "nome": "Soul of Seoul",
+      "link": "https://shopee.com.br/Celimax-Protetor-Solar-50ml-Prote%C3%A7%C3%A3o-UV-Clareamento-e-Hidrata%C3%A7%C3%A3o-i.1464232434.43757653662"
+    }
+  ],
+  "palavrasChave": [
+    "glory of seoul"
+  ],
   "redator": "assinatura",
   "modeloClaude": "claude-opus-5-5",
-
   "filtros": {
     "maximoPorRodada": 4,
     "candidatosPorLoja": 15,
