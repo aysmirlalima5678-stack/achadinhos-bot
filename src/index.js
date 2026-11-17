@@ -149,9 +149,24 @@ async function carregarLojasAutorizadas(config) {
   return lojasAutorizadas;
 }
 
+let geracao = 0; // muda quando ela manda "parar": os envios em andamento são cancelados
+const cancelado = (g) => g !== geracao;
+
 async function tratarLinks(grupoId, texto, msg) {
-  const links = [...new Set(texto.match(REGEX_LINK) || [])];
+  if (/^\s*(parar|pare|stop)\s*[.!]*\s*$/i.test(texto)) {
+    geracao++;
+    console.log('⏹️  Envios interrompidos a pedido.');
+    await enviar(grupoId, '⏹️ Parei os envios.', null, msg);
+    return;
+  }
+  const minhaGeracao = geracao;
+  let links = [...new Set(texto.match(REGEX_LINK) || [])];
   if (!links.length) return;
+  const limite = Number(lerConfig().relampagoMaximo || 15);
+  if (links.length > limite) {
+    await enviar(grupoId, `Recebi ${links.length} links. Vou fazer só os ${limite} primeiros (para parar, escreva *parar*).`, null, msg);
+    links = links.slice(0, limite);
+  }
   const config = lerConfig();
   const relampago = /rel[aâ]mpago|flash/i.test(texto);
   const lojas = await carregarLojasAutorizadas(config);
@@ -159,6 +174,7 @@ async function tratarLinks(grupoId, texto, msg) {
 
   const produtos = [];
   for (const link of links) {
+    if (cancelado(minhaGeracao)) return;
     const completo = await expandirLink(link);
     const ids = extrairIds(completo);
 
@@ -199,8 +215,9 @@ async function tratarLinks(grupoId, texto, msg) {
   }
   if (!produtos.length) return;
 
+  if (cancelado(minhaGeracao)) return;
   if (produtos.length > 3) {
-    await enviar(grupoId, `${relampago ? '⚡ ' : ''}Recebi ${produtos.length} produtos. Preparando os rascunhos...`, null, msg);
+    await enviar(grupoId, `${relampago ? '⚡ ' : ''}Recebi ${produtos.length} produtos. Preparando os rascunhos... (para parar, escreva *parar*)`, null, msg);
   }
   const modo = modoRedator(config);
   let total = 0;
@@ -216,6 +233,7 @@ async function tratarLinks(grupoId, texto, msg) {
       itens = lote.map((p) => ({ produto: p, mensagem: (relampago ? '⚡ *Oferta relâmpago*\n\n' : '') + mensagemSimples(p) }));
     }
     for (const { produto, mensagem } of itens) {
+      if (cancelado(minhaGeracao)) return;
       await enviar(grupoId, mensagem, produto.imageUrl, produtos.length <= 3 ? msg : undefined);
       total++;
       await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
@@ -229,6 +247,7 @@ async function tratarLinks(grupoId, texto, msg) {
  * Devolve false se não conseguiu ler a lista (aí o robô manda só o link da lista).
  */
 async function tratarListaRelampago(grupoId, shopId, link, lojas, config, msg) {
+  const minhaGeracao = geracao;
   if (lojas.size && !lojas.has(String(shopId))) {
     await enviar(grupoId, '⛔ Essa loja não está na lista de lojas autorizadas.', null, msg);
     return true;
@@ -280,6 +299,7 @@ async function tratarListaRelampago(grupoId, shopId, link, lojas, config, msg) {
       itens = lote.map((p) => ({ produto: p, mensagem: '⚡ *Oferta relâmpago*\n\n' + mensagemSimples(p) }));
     }
     for (const { produto, mensagem } of itens) {
+      if (cancelado(minhaGeracao)) return true;
       await enviar(grupoId, mensagem, produto.imageUrl);
       await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
     }

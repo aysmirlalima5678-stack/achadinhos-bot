@@ -101,4 +101,6 @@ A Shopee bloqueia o robô de abrir a lista sozinho. Então o Chrome do tablet co
 1. Abra a aba de ofertas relâmpago da loja (modo computador) e **role até o fim**, para todos os produtos aparecerem.
 2. Toque na barra de endereço, digite `relampago` e toque na sugestão com a ☆ (o favorito).
 3. Vai aparecer "X produtos copiados!".
-4. No WhatsApp, **cole no grupo Crônicas da Milla** e envie. O robô faz um rascunho para cada produto ⚡.
+4. No WhatsApp, **cole no grupo Crônicas da Milla** e envie. O robô faz um rascunho para cada produto ⚡ (no máximo 15 por vez).
+
+**Para interromper os envios:** escreva **parar** no grupo Crônicas da Milla.
