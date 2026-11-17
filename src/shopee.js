@@ -12,7 +12,8 @@ async function chamarApi(query, variables = {}) {
     throw new Error('Faltam SHOPEE_APP_ID e/ou SHOPEE_SECRET no arquivo .env');
   }
 
-  const payload = JSON.stringify({ query, variables });
+  // A Shopee prefere os valores escritos direto na query (sem "variables")
+  const payload = JSON.stringify(Object.keys(variables).length ? { query, variables } : { query });
   const timestamp = Math.floor(Date.now() / 1000);
   const assinatura = crypto
     .createHash('sha256')
@@ -41,7 +42,6 @@ const CAMPOS = `
   productName
   shopId
   shopName
-  price
   priceMin
   priceMax
   priceDiscountRate
@@ -59,28 +59,38 @@ const CAMPOS = `
  *           4 = menor preço, 5 = maior comissão
  */
 export async function buscarProdutos({ shopId, palavraChave, ordem = 2, limite = 20 }) {
-  const query = `
-    query ($shopId: Int64, $keyword: String, $sortType: Int, $limit: Int) {
-      productOfferV2(shopId: $shopId, keyword: $keyword, sortType: $sortType, page: 1, limit: $limit) {
-        nodes { ${CAMPOS} }
-      }
-    }`;
-  const variables = { sortType: ordem, limit: limite };
-  if (shopId) variables.shopId = Number(shopId);
-  if (palavraChave) variables.keyword = palavraChave;
-
-  const data = await chamarApi(query, variables);
+  const args = [];
+  if (shopId) args.push(`shopId: ${Number(shopId)}`);
+  if (palavraChave) args.push(`keyword: ${JSON.stringify(String(palavraChave))}`);
+  args.push(`sortType: ${Number(ordem)}`, 'page: 1', `limit: ${Number(limite)}`);
+  const query = `{ productOfferV2(${args.join(', ')}) { nodes { ${CAMPOS} } } }`;
+  const data = await chamarApi(query);
   return data?.productOfferV2?.nodes ?? [];
 }
 
 /** Transforma qualquer link da Shopee em link curto de afiliado. */
 export async function gerarLinkAfiliado(url) {
-  const query = `
-    mutation ($url: String!) {
-      generateShortLink(input: { originUrl: $url, subIds: ["whatsapp"] }) { shortLink }
-    }`;
-  const data = await chamarApi(query, { url });
+  const query = `mutation { generateShortLink(input: { originUrl: ${JSON.stringify(String(url))}, subIds: ["whatsapp"] }) { shortLink } }`;
+  const data = await chamarApi(query);
   return data?.generateShortLink?.shortLink;
+}
+
+/**
+ * Links curtos do botão "Compartilhar" do app (s.shopee.com.br/..., shope.ee/...)
+ * não têm o número da loja. Aqui abrimos o link para descobrir o endereço completo.
+ */
+async function expandirLink(texto) {
+  const s = String(texto || '').trim();
+  if (!/^https?:\/\/(s\.shopee\.com\.br|shope\.ee|shp\.ee)\//i.test(s)) return s;
+  try {
+    const r = await fetch(s, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (extrairShopId(r.url)) return r.url;
+    const html = await r.text();
+    const m = html.match(/https?:\/\/shopee\.com\.br\/[^"'\s]*(-i\.\d+\.\d+|\/product\/\d+\/\d+)/);
+    return m ? m[0] : r.url;
+  } catch {
+    return s;
+  }
 }
 
 /** Pega o "nome de usuário" da loja num link tipo https://shopee.com.br/koksara.br?... */
@@ -112,11 +122,12 @@ function lerIds() { try { return JSON.parse(fs.readFileSync(ARQ_IDS, 'utf8')); }
  */
 export async function resolverLoja(loja) {
   if (loja.shopId) return String(loja.shopId);
-  const direto = extrairShopId(loja.link);
+  const link = await expandirLink(loja.link);
+  const direto = extrairShopId(link);
   if (direto) return direto;
 
   // Sem link? Procura pelo nome da loja.
-  const usuario = extrairUsuarioLoja(loja.link);
+  const usuario = extrairUsuarioLoja(link);
   const chave = usuario || `nome:${loja.nome}`;
   const cache = lerIds();
   if (cache[chave]) return cache[chave];
@@ -135,8 +146,7 @@ export async function resolverLoja(loja) {
   if (!id) {
     const nome = usuario ? usuario.replace(/\.br$/, '') : loja.nome;
     const data = await chamarApi(
-      `query ($k: String) { shopOfferV2(keyword: $k, page: 1, limit: 10) { nodes { shopId shopName originalLink } } }`,
-      { k: nome },
+      `{ shopOfferV2(keyword: ${JSON.stringify(nome)}, page: 1, limit: 20) { nodes { shopId shopName originalLink } } }`,
     );
     const nodes = data?.shopOfferV2?.nodes ?? [];
     const limpa = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
