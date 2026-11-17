@@ -9,10 +9,11 @@
     { "nome": "Jadoo",          "link": "https://shopee.com.br/ddosong2kv.br" },
     { "nome": "Younfamily",     "link": "https://shopee.com.br/younfamily.br" },
     { "nome": "Likeitlikeit",   "link": "" },
-    { "nome": "Jolse",          "link": "https://shopee.com.br/jolse.br" }
+    { "nome": "Jolse",          "link": "https://shopee.com.br/jolse.br" },
+    { "nome": "Soul of Seoul",  "link": "https://shopee.com.br/sosbeautybr.br" }
   ],
 
-  "palavrasChave": [],
+  "palavrasChave": ["glory of seoul"],
 
   "redator": "assinatura",
   "modeloClaude": "claude-opus-5-5",

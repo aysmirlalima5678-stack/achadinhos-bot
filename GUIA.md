@@ -79,7 +79,7 @@ Cole:
 ```bash
 nano config.json
 ```
-As suas 6 lojas autorizadas já estão lá. **Glory Of Seoul** e **Likeitlikeit** estão sem link: o robô tenta achar essas lojas pelo nome. Se ele avisar que não achou, cole no campo `"link"` o link de qualquer produto dessa loja.
+As suas 7 lojas autorizadas já estão lá. **Glory Of Seoul** e **Likeitlikeit** estão sem link: o robô tenta achar essas lojas pelo nome. Se ele avisar que não achou, cole no campo `"link"` o link de qualquer produto dessa loja.
 
 Outras coisas que dá para mudar:
 - `"horarios"`: quando ele manda os rascunhos
