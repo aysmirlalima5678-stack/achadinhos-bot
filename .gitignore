@@ -5,3 +5,5 @@ enviados.json
 lojas-ids.json
 *.zip
 memoria-grupos.json
+historico.txt
+*.txt.bak

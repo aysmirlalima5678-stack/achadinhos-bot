@@ -16,6 +16,35 @@ function carregar() {
   return mem;
 }
 
+/** Salva na hora (usado no fim da importação). */
+export function salvarAgora() {
+  clearTimeout(timer);
+  if (mem) fs.writeFileSync(ARQ, JSON.stringify({ msgs: mem.msgs }));
+}
+
+/** Nome usado para as mensagens que vieram do arquivo exportado do grupo oficial. */
+export const CHAT_IMPORTADO = 'importado-grupo-oficial';
+
+/**
+ * Lê o arquivo de "Exportar conversa" do WhatsApp (iPhone ou Android) e devolve os posts.
+ * Formatos: "[12/05/2026, 14:48:42] Nome: texto" ou "12/05/2026 14:48 - Nome: texto".
+ */
+export function lerExportacao(texto, apenasAutor = '') {
+  const re = /^\u200e?\[?(\d{1,2})\/(\d{1,2})\/(\d{2,4}),? (\d{1,2}):(\d{2})(?::(\d{2}))?\]?(?: -)? ([^:\n]+): /gm;
+  const marcas = [...texto.matchAll(re)];
+  const posts = [];
+  marcas.forEach((m, i) => {
+    const fim = i + 1 < marcas.length ? marcas[i + 1].index : texto.length;
+    const corpo = texto.slice(m.index + m[0].length, fim).replace(/\u200e?<Mensagem editada>/g, '').replace(/[\u200e\ufffc]/g, '').trim();
+    const autor = m[7].trim();
+    if (apenasAutor && !autor.toLowerCase().includes(apenasAutor.toLowerCase())) return;
+    const ano = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    const ts = Math.floor(new Date(ano, Number(m[2]) - 1, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6] || 0)).getTime() / 1000);
+    posts.push({ id: `imp-${ts}-${i}`, ts, autor, texto: corpo });
+  });
+  return posts;
+}
+
 function salvarDepois() {
   clearTimeout(timer);
   timer = setTimeout(() => {

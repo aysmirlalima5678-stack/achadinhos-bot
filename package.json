@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "agora": "node src/index.js --agora",
     "testar-shopee": "node src/index.js --testar-shopee",
-    "religar": "node src/index.js --religar"
+    "religar": "node src/index.js --religar",
+    "importar": "node src/index.js --importar historico.txt"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import cron from 'node-cron';
 import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado, extrairLojaRelampago, buscarRelampagoDaLoja } from './shopee.js';
 import { conectar, acharGrupo, enviar, aoReceberMensagem, aoGuardarMensagem, idsDosGrupos } from './whatsapp.js';
-import { guardar, buscarParecida, exemplosDeEstilo, totalDoGrupo } from './memoria.js';
+import { guardar, buscarParecida, exemplosDeEstilo, totalDoGrupo, lerExportacao, salvarAgora, CHAT_IMPORTADO } from './memoria.js';
 import { modoRedator, escolherEEscrever, escreverEscolhidos } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
@@ -22,22 +22,20 @@ const reais = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', curr
 // Mensagem simples, usada só se não houver chave do Claude configurada.
 function mensagemSimples(p) {
   return [
-    `💖 *${p.productName.trim()}*`,
+    `💗 *${p.productName.trim()}*`,
     '',
-    `💰 Por: ${reais(p.precoFinal)}`,
-    '👇 Aproveite aqui:',
-    p.offerLink,
+    `💰 *Por: ${reais(p.precoFinal)}*`,
+    '✈️ *Impostos calculados no carrinho*',
     '',
-    '✈️ Compra internacional: impostos calculados no carrinho',
+    `🛒 *Link:* ${p.offerLink}`,
   ].join('\n');
 }
 
 // ---------- Memória do grupo oficial (só leitura) ----------
-let idsOficiais = [];
+let idsOficiais = [CHAT_IMPORTADO]; // mensagens importadas do arquivo + grupo oficial ao vivo
 
 /** Marca nos produtos se ela já postou o mesmo produto no grupo oficial e devolve exemplos do estilo dela. */
 function contextoDaMemoria(produtos) {
-  if (!idsOficiais.length) return [];
   let achados = 0;
   for (const p of produtos) {
     if (achados >= 10) break;
@@ -211,7 +209,7 @@ async function tratarLinks(grupoId, texto, msg) {
         const linhas = ehRelampago
           ? ['⚡ *Ofertas relâmpago no ar!*', '', 'Preços especiais por tempo limitado. Corre antes que acabe! ⏳', '', '👇 Veja todas aqui:', curto]
           : ['🛍️ *Ofertas selecionadas*', '', '👇 Confira aqui:', curto];
-        linhas.push('', '✈️ Compra internacional: impostos calculados no carrinho');
+        linhas.push('', '✈️ *Impostos calculados no carrinho*');
         await enviar(grupoId, linhas.join('\n'), null, msg);
       } catch (e) {
         await enviar(grupoId, `⚠️ Não consegui gerar o link de afiliada para este link (${e.message}).`, null, msg);
@@ -357,6 +355,25 @@ if (args.includes('--testar-shopee')) {
   process.exit(0);
 }
 
+if (args.includes('--importar')) {
+  // Importa o arquivo "Exportar conversa" do grupo oficial (só posts de oferta, com R$)
+  const arq = args[args.indexOf('--importar') + 1] || 'historico.txt';
+  if (!fs.existsSync(arq)) {
+    console.log(`❌ Não achei o arquivo "${arq}" na pasta do robô. Veja o guia (Importar o histórico).`);
+    process.exit(1);
+  }
+  const posts = lerExportacao(fs.readFileSync(arq, 'utf8'));
+  let n = 0;
+  for (const p of posts) {
+    if (!/R\$/.test(p.texto) || p.texto.length < 150) continue;
+    if (guardar({ chat: CHAT_IMPORTADO, id: p.id, ts: p.ts, texto: p.texto })) n++;
+  }
+  salvarAgora();
+  console.log(`📚 Importei ${n} posts de oferta (de ${posts.length} mensagens). Memória do grupo oficial: ${totalDoGrupo([CHAT_IMPORTADO])}.`);
+  console.log('Pode apagar o arquivo de histórico se quiser: ele já está guardado na memória.');
+  process.exit(0);
+}
+
 // Guarda as mensagens dos grupos (inclusive o histórico que chega ao conectar)
 aoGuardarMensagem(guardar);
 
@@ -367,8 +384,8 @@ if (args.includes('--religar')) {
 }
 
 await conectar();
-idsOficiais = await idsDosGrupos(lerConfig().gruposLeitura || []).catch(() => []);
-if (idsOficiais.length) console.log(`📚 Memória do grupo oficial: ${totalDoGrupo(idsOficiais)} mensagens guardadas.`);
+idsOficiais = [CHAT_IMPORTADO, ...(await idsDosGrupos(lerConfig().gruposLeitura || []).catch(() => []))];
+console.log(`📚 Memória do grupo oficial: ${totalDoGrupo(idsOficiais)} mensagens guardadas.`);
 
 if (args.includes('--religar')) {
   console.log('\n⏳ Recebendo o histórico dos grupos... espere uns 3 minutos, sem mexer.');
