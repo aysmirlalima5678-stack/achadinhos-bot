@@ -1,24 +1,26 @@
 {
-  "grupoRascunhos": "Rascunhos",
+  "grupoRascunhos": "Crônicas da Milla",
 
-  "horarios": ["09:00", "13:00", "19:00"],
+  "horarios": ["10:00", "19:00"],
 
   "lojas": [
-    { "nome": "Koksara K-Beauty",        "link": "https://shopee.com.br/koksara.br" },
-    { "nome": "Jadoo Seoul Internacional", "link": "https://shopee.com.br/ddosong2kv.br" },
-    { "nome": "Jolse",                   "link": "https://shopee.com.br/jolse.br" },
-    { "nome": "Younfamily",              "link": "https://shopee.com.br/younfamily.br" },
-    { "nome": "Soul of Seoul",           "link": "https://shopee.com.br/sosbeautybr.br" }
+    { "nome": "Koksara",        "link": "https://shopee.com.br/koksara.br" },
+    { "nome": "Glory Of Seoul", "link": "" },
+    { "nome": "Jadoo",          "link": "https://shopee.com.br/ddosong2kv.br" },
+    { "nome": "Younfamily",     "link": "https://shopee.com.br/younfamily.br" },
+    { "nome": "Likeitlikeit",   "link": "" },
+    { "nome": "Jolse",          "link": "https://shopee.com.br/jolse.br" }
   ],
 
-  "palavrasChave": ["glory of seoul"],
+  "palavrasChave": [],
+
+  "modeloClaude": "claude-opus-5-5",
 
   "filtros": {
-    "descontoMinimo": 20,
-    "precoMaximo": 300,
+    "maximoPorRodada": 4,
+    "candidatosPorLoja": 15,
+    "precoMaximo": 400,
     "notaMinima": 4.5,
-    "produtosPorLoja": 3,
-    "maximoPorRodada": 10,
     "naoRepetirPorDias": 7
   }
 }

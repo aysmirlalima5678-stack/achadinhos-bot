@@ -67,6 +67,11 @@ export function conectar() {
 
 /** Acha o grupo pelo nome (ignora maiúsculas/minúsculas). */
 export async function acharGrupo(nome) {
+  // Trava de segurança: o robô NUNCA posta no grupo oficial. Só ela posta lá.
+  if (/alerta\s*k-?\s*beauty/i.test(nome)) {
+    console.log('⛔ O robô não pode mandar no grupo oficial Alerta K-Beauty. Use o grupo de rascunhos.');
+    return null;
+  }
   const grupos = await sock.groupFetchAllParticipating();
   const lista = Object.values(grupos);
   const alvo = lista.find((g) => g.subject?.trim().toLowerCase() === nome.trim().toLowerCase());

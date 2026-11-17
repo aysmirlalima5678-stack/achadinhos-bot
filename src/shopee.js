@@ -115,14 +115,15 @@ export async function resolverLoja(loja) {
   const direto = extrairShopId(loja.link);
   if (direto) return direto;
 
+  // Sem link? Procura pelo nome da loja.
   const usuario = extrairUsuarioLoja(loja.link);
-  if (!usuario) return null;
+  const chave = usuario || `nome:${loja.nome}`;
   const cache = lerIds();
-  if (cache[usuario]) return cache[usuario];
+  if (cache[chave]) return cache[chave];
 
   let id = null;
   // 1ª tentativa: página pública da Shopee
-  try {
+  if (usuario) try {
     const r = await fetch(`https://shopee.com.br/api/v4/shop/get_shop_detail?username=${encodeURIComponent(usuario)}`, {
       headers: { 'User-Agent': 'Mozilla/5.0', 'X-Requested-With': 'XMLHttpRequest' },
     });
@@ -132,20 +133,21 @@ export async function resolverLoja(loja) {
 
   // 2ª tentativa: busca de lojas da API de afiliados, pelo nome
   if (!id) {
-    const nome = usuario.replace(/\.br$/, '');
+    const nome = usuario ? usuario.replace(/\.br$/, '') : loja.nome;
     const data = await chamarApi(
       `query ($k: String) { shopOfferV2(keyword: $k, page: 1, limit: 10) { nodes { shopId shopName originalLink } } }`,
       { k: nome },
     );
     const nodes = data?.shopOfferV2?.nodes ?? [];
+    const limpa = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const achada =
-      nodes.find((n) => (n.originalLink || '').toLowerCase().includes(usuario.toLowerCase())) ||
-      nodes.find((n) => n.shopName?.toLowerCase().replace(/\s/g, '').includes(nome.toLowerCase()));
+      (usuario && nodes.find((n) => (n.originalLink || '').toLowerCase().includes(usuario.toLowerCase()))) ||
+      nodes.find((n) => limpa(n.shopName).includes(limpa(nome)));
     if (achada) id = String(achada.shopId);
   }
 
   if (id) {
-    cache[usuario] = id;
+    cache[chave] = id;
     fs.writeFileSync(ARQ_IDS, JSON.stringify(cache, null, 2));
     console.log(`🔎 Loja "${loja.nome}" encontrada (número ${id})`);
   }

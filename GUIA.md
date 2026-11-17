@@ -1,8 +1,10 @@
-# 🤖 Robô de Achadinhos: guia passo a passo
+# 🤖 Robô Alerta K-Beauty: guia passo a passo
 
-O que ele faz: em horários definidos (por exemplo 9h, 13h e 19h), ele busca ofertas das suas lojas favoritas na Shopee, já com o **seu link de afiliado**, e manda tudo com foto, preço e desconto para o seu **grupo de rascunhos** no WhatsApp. Você só revisa e repassa.
+O que ele faz: em horários definidos, ele busca ofertas **só nas lojas autorizadas** da Shopee, escolhe as melhores pelo seu critério (qualidade, oportunidade ou lançamento), escreve cada mensagem no formato do Alerta K-Beauty, já com o **seu link de afiliado**, e manda tudo para o grupo de rascunhos **Crônicas da Milla**. Você revisa e posta no Alerta K-Beauty.
 
-**Custo: R$ 0.** A Shopee é grátis, o servidor da Oracle é grátis e o robô é seu.
+🔒 O robô tem uma trava: ele **nunca** manda nada no grupo Alerta K-Beauty.
+
+**Custo:** a Shopee e o servidor da Oracle são grátis. A parte que escreve as mensagens no seu estilo usa a API do Claude, que é paga por uso (veja o PASSO 1B). Sem ela, o robô funciona, mas manda só nome, preço e link.
 
 ---
 
@@ -10,7 +12,7 @@ O que ele faz: em horários definidos (por exemplo 9h, 13h e 19h), ele busca ofe
 - [ ] Ser afiliada da Shopee (você já é ✅)
 - [ ] Um cartão de crédito, **só para a Oracle confirmar sua identidade**. Ela não cobra nada no plano grátis.
 - [ ] De preferência, um **segundo número de WhatsApp** (um chip barato) para ser o robô. Dá para usar o seu, mas o segundo é mais seguro.
-- [ ] Um grupo no WhatsApp chamado **Rascunhos**, com você e o número do robô dentro
+- [ ] O grupo **Crônicas da Milla**, com o número do robô dentro
 
 ---
 
@@ -21,6 +23,11 @@ O que ele faz: em horários definidos (por exemplo 9h, 13h e 19h), ele busca ofe
 4. Quando for aprovado, aparecem dois códigos: **App ID** e **Secret** (ou "Senha"). Guarde os dois.
 
 > Enquanto espera a aprovação, você já pode fazer os passos 2 a 4.
+
+## PASSO 1B (opcional, mas recomendado): Chave do Claude, para escrever no seu estilo
+1. Entre em **platform.claude.com** e crie uma conta.
+2. Em **Billing**, coloque um cartão e um crédito pequeno (US$ 5 já dura bastante).
+3. Em **API Keys**, clique em **Create Key** e guarde a chave (começa com `sk-ant-`).
 
 ## PASSO 2: Criar o servidor grátis na Oracle (30 min)
 1. Entre em **oracle.com/cloud/free** e clique em **"Start for free"**.
@@ -56,28 +63,24 @@ Preencha assim, usando os seus dados:
 SHOPEE_APP_ID=12345678
 SHOPEE_SECRET=ABCDEF...
 WHATSAPP_NUMERO=5511999998888
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 Para salvar: **Ctrl+O**, depois **Enter**, depois **Ctrl+X**.
 
-## PASSO 6: Escolher suas lojas
+## PASSO 6: Conferir as configurações
 Cole:
 ```bash
 nano config.json
 ```
-Em `"lojas"`, coloque o nome e **o link de qualquer produto** de cada loja (é assim que o robô descobre a loja). Por exemplo:
-```json
-"lojas": [
-  { "nome": "Loja da Maria", "link": "https://shopee.com.br/Blusa-Tricot-i.123456.789012" },
-  { "nome": "Casa Bonita",   "link": "https://shopee.com.br/Organizador-i.654321.111222" }
-],
-```
-Outras coisas que dá para mudar:
-- `"horarios"`: quando ele manda as ofertas
-- `"descontoMinimo"`: só manda produto com pelo menos esse % de desconto
-- `"precoMaximo"`, `"notaMinima"`, `"produtosPorLoja"` e `"maximoPorRodada"`
-- `"palavrasChave"`: por exemplo `["air fryer", "skincare"]`, para buscar em toda a Shopee
+As suas 6 lojas autorizadas já estão lá. **Glory Of Seoul** e **Likeitlikeit** estão sem link: o robô tenta achar essas lojas pelo nome. Se ele avisar que não achou, cole no campo `"link"` o link de qualquer produto dessa loja.
 
-> Ou mais fácil: **me mande a lista de lojas e eu deixo o config.json pronto para você.**
+Outras coisas que dá para mudar:
+- `"horarios"`: quando ele manda os rascunhos
+- `"maximoPorRodada"`: quantas ofertas, no máximo, por vez (pode ser menos, porque ele prioriza qualidade)
+- `"precoMaximo"` e `"notaMinima"`
+- `"modeloClaude"`: `claude-opus-5-5` (escreve melhor) ou `claude-haiku-5-5` (bem mais barato)
+
+> Ou mais fácil: **me peça e eu mudo para você.**
 
 ## PASSO 7: Testar a Shopee
 ```bash
@@ -90,7 +93,7 @@ Devem aparecer ofertas na tela. Se aparecer erro, me mande um print.
 npm run agora
 ```
 Vai aparecer um **CÓDIGO de 8 letras**. No celular do robô, abra **WhatsApp > Configurações > Aparelhos conectados > Conectar um aparelho > "Conectar com número de telefone"** e digite o código.
-Em seguida, as ofertas devem chegar no grupo Rascunhos. 🎉
+Em seguida, os rascunhos devem chegar no grupo Crônicas da Milla. 🎉
 
 ## PASSO 9: Deixar ligado para sempre
 ```bash
@@ -110,5 +113,7 @@ Se o último comando mostrar uma linha começando com `sudo env PATH=...`, copie
 | Desligar o robô | `pm2 stop achadinhos` |
 
 ## Avisos importantes
+- **Confira sempre o preço no carrinho antes de postar.** O robô usa o preço que a API de afiliados informa, e ele pode ser diferente do valor final do carrinho com impostos.
+- Na véspera das datas duplas (11/11, 12/12 etc.), às 20h, ele manda para os rascunhos o aviso de que as ofertas começam à meia-noite.
 - Esse jeito de conectar o WhatsApp **não é oficial**. Mandando só para o seu grupo e poucas vezes ao dia, o risco é baixo, mas existe. Por isso o segundo número é a opção mais segura.
 - A Oracle às vezes desliga máquinas grátis que ficam "paradas". Se um dia o robô sumir, é só me chamar.

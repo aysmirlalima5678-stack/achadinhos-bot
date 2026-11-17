@@ -1,113 +1,147 @@
-// Robô de achadinhos: busca ofertas na Shopee e manda pro grupo de rascunhos.
+// Robô Alerta K-Beauty: busca ofertas nas lojas autorizadas da Shopee,
+// escolhe as melhores, escreve as mensagens e manda para o grupo de RASCUNHOS.
 import 'dotenv/config';
 import fs from 'node:fs';
 import cron from 'node-cron';
-import { buscarProdutos, resolverLoja, extrairBusca } from './shopee.js';
+import { buscarProdutos, resolverLoja } from './shopee.js';
 import { conectar, acharGrupo, enviar } from './whatsapp.js';
+import { redatorAtivo, escolherEEscrever } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
 const ARQ_ENVIADOS = 'enviados.json';
 
 const lerConfig = () => JSON.parse(fs.readFileSync('config.json', 'utf8'));
-
 function lerEnviados() {
   try { return JSON.parse(fs.readFileSync(ARQ_ENVIADOS, 'utf8')); } catch { return {}; }
 }
 function salvarEnviados(e) { fs.writeFileSync(ARQ_ENVIADOS, JSON.stringify(e, null, 2)); }
 
-const reais = (v) =>
-  Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const reais = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-function precoDe(p) { return Number(p.priceMin ?? p.price ?? 0); }
-
-function formatarMensagem(p) {
-  const preco = precoDe(p);
-  const desconto = Number(p.priceDiscountRate || 0);
-  const linhas = [`🛍️ *${p.productName.trim()}*`, ''];
-  if (desconto > 0) {
-    const antigo = preco / (1 - desconto / 100);
-    linhas.push(`~${reais(antigo)}~ por *${reais(preco)}* (-${desconto}%)`);
-  } else {
-    linhas.push(`💰 *${reais(preco)}*`);
-  }
-  if (p.ratingStar) linhas.push(`⭐ ${Number(p.ratingStar).toFixed(1)}  •  ${p.sales ?? 0} vendidos`);
-  linhas.push(`🏪 ${p.shopName}`, '', `👉 ${p.offerLink}`);
-  return linhas.join('\n');
+// Mensagem simples, usada só se não houver chave do Claude configurada.
+function mensagemSimples(p) {
+  return [
+    `💖 *${p.productName.trim()}*`,
+    '',
+    `💰 Por: ${reais(p.precoFinal)}`,
+    '👇 Aproveite aqui:',
+    p.offerLink,
+    '',
+    '✈️ Impostos já inclusos',
+  ].join('\n');
 }
 
-async function coletarOfertas(config) {
+/** Busca os candidatos SOMENTE nas lojas autorizadas. */
+async function coletarCandidatos(config) {
   const f = config.filtros;
   const enviados = lerEnviados();
   const limiteTempo = Date.now() - f.naoRepetirPorDias * 86400000;
-  const passa = (p) =>
-    p.offerLink &&
-    Number(p.priceDiscountRate || 0) >= f.descontoMinimo &&
-    precoDe(p) <= f.precoMaximo &&
-    Number(p.ratingStar || 5) >= f.notaMinima &&
-    !(enviados[p.itemId] > limiteTempo);
 
-  const escolhidos = [];
-  const jaNaLista = new Set();
-  const adicionar = (lista, max) => {
-    let n = 0;
+  // 1) Descobre o número de cada loja autorizada
+  const lojasOk = new Map(); // shopId -> nome
+  for (const loja of config.lojas) {
+    try {
+      const id = await resolverLoja(loja);
+      if (id) lojasOk.set(String(id), loja.nome);
+      else console.log(`⚠️  Não achei a loja "${loja.nome}". Coloque no config.json o link de um PRODUTO dela.`);
+    } catch (e) { console.log(`⚠️  ${loja.nome}: ${e.message}`); }
+  }
+
+  const candidatos = new Map();
+  const considerar = (lista) => {
     for (const p of lista) {
-      if (n >= max || jaNaLista.has(p.itemId) || !passa(p)) continue;
-      jaNaLista.add(p.itemId);
-      escolhidos.push(p);
-      n++;
+      p.precoFinal = Number(p.priceMin ?? p.price ?? 0);
+      if (!lojasOk.has(String(p.shopId))) continue; // regra: só lojas autorizadas
+      if (!p.offerLink || !p.precoFinal) continue;
+      if (enviados[p.itemId] > limiteTempo) continue;
+      if (p.precoFinal > f.precoMaximo) continue;
+      if (Number(p.ratingStar || 5) < f.notaMinima) continue;
+      candidatos.set(String(p.itemId), p);
     }
   };
 
-  const palavras = [...(config.palavrasChave || [])];
-  for (const loja of config.lojas) {
-    const busca = extrairBusca(loja.link);
-    if (busca) { palavras.push(busca); continue; } // link de busca vira palavra-chave
-    try {
-      const shopId = await resolverLoja(loja);
-      if (!shopId) {
-        console.log(`⚠️  Não consegui descobrir a loja "${loja.nome}". Troque o link pelo link de um PRODUTO dela no config.json.`);
-        continue;
-      }
-      adicionar(await buscarProdutos({ shopId, ordem: 2, limite: 30 }), f.produtosPorLoja);
-    } catch (e) { console.log(`⚠️  ${loja.nome}: ${e.message}`); }
+  // 2) Produtos de cada loja (mais vendidos + maior desconto/relevância)
+  for (const [shopId, nome] of lojasOk) {
+    for (const ordem of [2, 1]) {
+      try { considerar(await buscarProdutos({ shopId, ordem, limite: f.candidatosPorLoja })); }
+      catch (e) { console.log(`⚠️  ${nome}: ${e.message}`); }
+    }
   }
-  for (const palavra of palavras) {
-    try {
-      adicionar(await buscarProdutos({ palavraChave: palavra, ordem: 2, limite: 30 }), f.produtosPorLoja);
-    } catch (e) { console.log(`⚠️  "${palavra}": ${e.message}`); }
+  // 3) Palavras-chave (resultado filtrado para as lojas autorizadas)
+  for (const palavra of config.palavrasChave || []) {
+    try { considerar(await buscarProdutos({ palavraChave: palavra, ordem: 2, limite: 50 })); }
+    catch (e) { console.log(`⚠️  "${palavra}": ${e.message}`); }
   }
 
-  escolhidos.sort((a, b) => Number(b.priceDiscountRate) - Number(a.priceDiscountRate));
-  return escolhidos.slice(0, f.maximoPorRodada);
+  return [...candidatos.values()];
+}
+
+/** Escolhe e escreve. Devolve [{ produto, mensagem }]. */
+async function prepararMensagens(config) {
+  const candidatos = await coletarCandidatos(config);
+  console.log(`🔎 ${candidatos.length} produtos candidatos nas lojas autorizadas.`);
+  if (!candidatos.length) return [];
+  const max = config.filtros.maximoPorRodada;
+
+  if (redatorAtivo()) {
+    const escolhidos = await escolherEEscrever(candidatos, { maximo: max, modelo: config.modeloClaude });
+    escolhidos.forEach((e) => console.log(`   ✔ ${e.produto.productName.slice(0, 60)} — ${e.motivo}`));
+    return escolhidos;
+  }
+  // Sem Claude: pega os de maior desconto e usa a mensagem simples
+  return candidatos
+    .sort((a, b) => Number(b.priceDiscountRate || 0) - Number(a.priceDiscountRate || 0))
+    .slice(0, max)
+    .map((p) => ({ produto: p, mensagem: mensagemSimples(p) }));
 }
 
 async function rodada() {
   const config = lerConfig();
-  console.log(`\n⏰ ${new Date().toLocaleString('pt-BR', { timeZone: FUSO })} — buscando ofertas...`);
+  console.log(`\n⏰ ${new Date().toLocaleString('pt-BR', { timeZone: FUSO })}: buscando ofertas...`);
   const grupoId = await acharGrupo(config.grupoRascunhos);
   if (!grupoId) return;
 
-  const ofertas = await coletarOfertas(config);
-  if (!ofertas.length) { console.log('Nenhuma oferta nova passou nos filtros.'); return; }
+  const itens = await prepararMensagens(config);
+  if (!itens.length) { console.log('Nenhuma oferta boa nesta rodada.'); return; }
 
   const enviados = lerEnviados();
-  for (const p of ofertas) {
-    await enviar(grupoId, formatarMensagem(p), p.imageUrl);
-    enviados[p.itemId] = Date.now();
+  for (const { produto, mensagem } of itens) {
+    await enviar(grupoId, mensagem, produto.imageUrl);
+    enviados[produto.itemId] = Date.now();
     salvarEnviados(enviados);
-    await new Promise((r) => setTimeout(r, 4000 + Math.random() * 4000)); // pausa entre mensagens
+    await new Promise((r) => setTimeout(r, 4000 + Math.random() * 4000));
   }
-  console.log(`✅ ${ofertas.length} ofertas enviadas.`);
+  console.log(`✅ ${itens.length} rascunhos enviados para "${config.grupoRascunhos}".`);
+}
+
+// Véspera de data dupla da Shopee (3/3, 4/4 ... 11/11, 12/12)
+async function avisoDataDupla() {
+  const amanha = new Date(new Date().toLocaleString('en-US', { timeZone: FUSO }));
+  amanha.setDate(amanha.getDate() + 1);
+  const d = amanha.getDate(), m = amanha.getMonth() + 1;
+  if (d !== m) return;
+  const config = lerConfig();
+  const grupoId = await acharGrupo(config.grupoRascunhos);
+  if (!grupoId) return;
+  const texto = [
+    `🚨 *Amanhã é ${d}/${m} na Shopee, meninas!*`,
+    '',
+    'Os cupons e as ofertas começam à *meia-noite* 🕛 e costumam esgotar bem rápido. Depois que acabam, o preço não volta, então vale ficar de olho!',
+    '',
+    'Vou mandar aqui no grupo todas as ofertas e cupons que valerem a pena 💕',
+  ].join('\n');
+  await enviar(grupoId, texto);
+  console.log(`📅 Aviso de ${d}/${m} enviado para os rascunhos.`);
 }
 
 // ---------- início ----------
 const args = process.argv.slice(2);
 
 if (args.includes('--testar-shopee')) {
-  // Só testa a Shopee, sem WhatsApp
-  const ofertas = await coletarOfertas(lerConfig());
-  console.log(`Encontrei ${ofertas.length} ofertas:\n`);
-  ofertas.forEach((p) => console.log(formatarMensagem(p) + '\n---'));
+  // Testa a busca (e o Claude, se configurado) sem mandar nada no WhatsApp
+  const itens = await prepararMensagens(lerConfig());
+  console.log(`\n${itens.length} rascunhos:\n`);
+  itens.forEach((i) => console.log(i.mensagem + '\n\n----------\n'));
   process.exit(0);
 }
 
@@ -119,9 +153,11 @@ if (args.includes('--agora')) {
   setTimeout(() => process.exit(0), 3000);
 } else {
   const config = lerConfig();
+  const executar = (fn) => () => fn().catch((e) => console.log('Erro:', e.message));
   for (const h of config.horarios) {
     const [hora, min] = h.split(':').map(Number);
-    cron.schedule(`${min} ${hora} * * *`, () => rodada().catch((e) => console.log('Erro:', e.message)), { timezone: FUSO });
+    cron.schedule(`${min} ${hora} * * *`, executar(rodada), { timezone: FUSO });
   }
-  console.log(`🤖 Robô ligado! Vai mandar ofertas às ${config.horarios.join(', ')} (horário de Brasília).`);
+  cron.schedule('0 20 * * *', executar(avisoDataDupla), { timezone: FUSO });
+  console.log(`🤖 Robô ligado! Rascunhos às ${config.horarios.join(', ')} (horário de Brasília) no grupo "${config.grupoRascunhos}".`);
 }
