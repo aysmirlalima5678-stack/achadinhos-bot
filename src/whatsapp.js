@@ -12,6 +12,20 @@ let sock = null;
 let pronto = false;
 let jaPediuCodigo = false; // pede o código só uma vez por execução
 
+/**
+ * No WhatsApp, celulares brasileiros com DDD 31 ou maior costumam ser registrados
+ * SEM o 9 extra (ex.: 55 85 9XXXX-XXXX vira 55 85 XXXX-XXXX).
+ * Para não tirar o 9, coloque WHATSAPP_MANTER_9=sim no .env.
+ */
+function numeroParaWhatsApp(texto) {
+  const n = String(texto || '').replace(/\D/g, '');
+  const manter9 = /^s/i.test(process.env.WHATSAPP_MANTER_9 || '');
+  if (!manter9 && n.length === 13 && n.startsWith('55') && Number(n.slice(2, 4)) >= 31 && n[4] === '9') {
+    return n.slice(0, 4) + n.slice(5);
+  }
+  return n;
+}
+
 export function conectar() {
   return new Promise(async (resolve) => {
     const { state, saveCreds } = await useMultiFileAuthState('sessao-whatsapp');
@@ -21,7 +35,6 @@ export function conectar() {
       version,
       auth: state,
       logger: pino({ level: 'silent' }),
-      browser: ['Achadinhos Bot', 'Chrome', '1.0'],
       markOnlineOnConnect: false,
     });
 
@@ -31,9 +44,10 @@ export function conectar() {
       const { connection, lastDisconnect, qr } = u;
 
       if (qr && !state.creds.registered && !state.creds.me) {
-        const numero = (process.env.WHATSAPP_NUMERO || '').replace(/\D/g, '');
+        const numero = numeroParaWhatsApp(process.env.WHATSAPP_NUMERO);
         if (numero && !jaPediuCodigo) {
           jaPediuCodigo = true;
+          console.log(`📱 Pedindo código para o número ${numero}`);
           const codigo = await sock.requestPairingCode(numero);
           console.log('\n==============================================');
           console.log(`  CÓDIGO PARA CONECTAR O WHATSAPP:  ${codigo}`);
