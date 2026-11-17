@@ -1,5 +1,9 @@
 {
   "grupoRascunhos": "Crônicas da Milla",
+  "gruposProibidos": [
+    "Alerta K-Beauty",
+    "Skincare & K-Beauty"
+  ],
   "horarios": [
     "10:00",
     "19:00"

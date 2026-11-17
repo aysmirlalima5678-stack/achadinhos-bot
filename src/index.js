@@ -120,7 +120,7 @@ async function prepararMensagens(config) {
 async function rodada() {
   const config = lerConfig();
   console.log(`\n⏰ ${new Date().toLocaleString('pt-BR', { timeZone: FUSO })}: buscando ofertas...`);
-  const grupoId = await acharGrupo(config.grupoRascunhos);
+  const grupoId = await acharGrupo(config.grupoRascunhos, config.gruposProibidos);
   if (!grupoId) return;
 
   const itens = await prepararMensagens(config);
@@ -143,7 +143,7 @@ async function avisoDataDupla() {
   const d = amanha.getDate(), m = amanha.getMonth() + 1;
   if (d !== m) return;
   const config = lerConfig();
-  const grupoId = await acharGrupo(config.grupoRascunhos);
+  const grupoId = await acharGrupo(config.grupoRascunhos, config.gruposProibidos);
   if (!grupoId) return;
   const texto = [
     `🚨 *Amanhã é ${d}/${m} na Shopee, meninas!*`,

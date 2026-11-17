@@ -84,23 +84,36 @@ export function conectar() {
   });
 }
 
-/** Acha o grupo pelo nome (ignora maiúsculas/minúsculas). */
-export async function acharGrupo(nome) {
-  // Trava de segurança: o robô NUNCA posta no grupo oficial. Só ela posta lá.
-  if (/alerta\s*k-?\s*beauty/i.test(nome)) {
-    console.log('⛔ O robô não pode mandar no grupo oficial Alerta K-Beauty. Use o grupo de rascunhos.');
+/** Deixa só letras e números (sem emoji, acento ou símbolo) para comparar nomes de grupo. */
+function limparNome(t) {
+  return String(t || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Acha o grupo pelo nome (ignora emoji, acento e maiúsculas).
+ * Trava de segurança: o robô NUNCA posta nos grupos oficiais (lista em config.json > gruposProibidos).
+ */
+export async function acharGrupo(nome, gruposProibidos = []) {
+  const proibidos = ['Alerta K-Beauty', ...gruposProibidos].map(limparNome).filter(Boolean);
+  const ehProibido = (n) => proibidos.some((p) => limparNome(n).includes(p));
+  if (ehProibido(nome)) {
+    console.log(`⛔ "${nome}" é um grupo oficial. O robô só manda no grupo de rascunhos.`);
     return null;
   }
-  const grupos = await sock.groupFetchAllParticipating();
-  const lista = Object.values(grupos);
-  const alvo = lista.find((g) => g.subject?.trim().toLowerCase() === nome.trim().toLowerCase());
-  if (!alvo) {
+  const grupos = Object.values(await sock.groupFetchAllParticipating());
+  const alvo = limparNome(nome);
+  const achado =
+    grupos.find((g) => limparNome(g.subject) === alvo) ||
+    grupos.find((g) => limparNome(g.subject).startsWith(alvo));
+  if (!achado || ehProibido(achado.subject)) {
     console.log(`\n⚠️  Não achei o grupo "${nome}". Seus grupos são:`);
-    lista.forEach((g) => console.log(`   - ${g.subject}`));
-    console.log('Copie o nome exato para "grupoRascunhos" no config.json.\n');
+    grupos.forEach((g) => console.log(`   - ${g.subject}`));
+    console.log('Copie o nome para "grupoRascunhos" no config.json.\n');
     return null;
   }
-  return alvo.id;
+  return achado.id;
 }
 
 export async function enviar(grupoId, texto, imagemUrl) {
