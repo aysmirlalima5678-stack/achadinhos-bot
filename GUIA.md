@@ -42,10 +42,9 @@ No painel da Oracle, abra sua instância e clique em **"Cloud Shell"** (ícone `
 Cole este comando e aperte Enter:
 
 ```bash
-git clone LINK_DO_PROJETO achadinhos-bot && cd achadinhos-bot && ./instalar.sh
+git clone https://github.com/aysmirlalima5678-stack/achadinhos-bot.git && cd achadinhos-bot && ./instalar.sh
 ```
 
-*(O Claude vai te passar o LINK_DO_PROJETO certo.)*
 
 ## PASSO 5: Colocar suas chaves
 Cole:
