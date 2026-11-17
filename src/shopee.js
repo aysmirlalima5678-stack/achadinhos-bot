@@ -90,13 +90,35 @@ export async function gerarLinkAfiliado(url) {
 export async function expandirLink(texto) {
   const s = String(texto || '').trim();
   if (!/^https?:\/\/(s\.shopee\.com\.br|shope\.ee|shp\.ee)\//i.test(s)) return s;
+  // Procura loja + produto em qualquer texto (links, parâmetros codificados, página)
+  const achar = (t) => {
+    let x = String(t || '');
+    try { x += ' ' + decodeURIComponent(x); } catch {}
+    try { x += ' ' + decodeURIComponent(x); } catch {}
+    const m = x.match(/-i\.(\d+)\.(\d+)/) || x.match(/\/product\/(\d+)\/(\d+)/)
+      || x.match(/shopid[="':\s]+(\d+)[^\d]{1,40}itemid[="':\s]+(\d+)/i);
+    if (m) return `https://shopee.com.br/product/${m[1]}/${m[2]}`;
+    const n = x.match(/itemid[="':\s]+(\d+)[^\d]{1,40}shopid[="':\s]+(\d+)/i);
+    return n ? `https://shopee.com.br/product/${n[2]}/${n[1]}` : null;
+  };
   try {
-    const r = await fetch(s, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (extrairShopId(r.url)) return r.url;
-    const html = await r.text();
-    const m = html.match(/https?:\/\/shopee\.com\.br\/[^"'\s]*(-i\.\d+\.\d+|\/product\/\d+\/\d+)/);
-    return m ? m[0] : r.url;
-  } catch {
+    let url = s;
+    const caminho = [];
+    for (let i = 0; i < 8; i++) {
+      const r = await fetch(url, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36' } });
+      const prox = r.headers.get('location');
+      const achado = achar(url) || achar(prox);
+      if (achado) { console.log(`   🔗 link curto → ${achado}`); return achado; }
+      if (prox) { url = new URL(prox, url).href; caminho.push(url); continue; }
+      const html = await r.text();
+      const noHtml = achar(html.slice(0, 200000));
+      if (noHtml) { console.log(`   🔗 link curto → ${noHtml}`); return noHtml; }
+      break;
+    }
+    console.log(`   ⚠️  Não descobri o produto do link curto. Caminho: ${caminho.join(' → ').slice(0, 300) || '(sem redirecionamento)'}`);
+    return url;
+  } catch (e) {
+    console.log(`   ⚠️  Não consegui abrir o link curto (${e.message})`);
     return s;
   }
 }

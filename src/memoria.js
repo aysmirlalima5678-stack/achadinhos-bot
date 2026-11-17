@@ -117,3 +117,27 @@ export function exemplosDeEstilo(chats, quantos = 5) {
     .slice(-quantos)
     .map((m) => m.texto.slice(0, 1200));
 }
+
+/** Acha um post dela que contenha esse link (ex.: link de afiliada de um post antigo). */
+export function buscarPorLink(link, chats) {
+  const base = String(link || '').split('?')[0].replace(/\/+$/, '');
+  if (!base) return null;
+  const set = new Set(chats);
+  const achados = carregar().msgs.filter((m) => set.has(m.chat) && m.texto.includes(base));
+  return achados.sort((a, b) => b.ts - a.ts)[0] || null;
+}
+
+/** Tenta tirar o nome do produto de um post dela (linha com coração + *Nome*). */
+export function nomeDoProdutoNoPost(texto) {
+  const linhas = String(texto || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  // 1º: linha que começa com coração (é como ela escreve o nome do produto)
+  for (const l of linhas) {
+    const m = l.match(/^(?:❤️|🧡|💛|💚|💙|🩵|💜|🖤|🤍|🤎|🩷|💗|💖|💕|💞|💓|💝|♥️)\s*\*([^*]{4,120})\*/u);
+    if (m) return m[1].trim();
+  }
+  for (const l of linhas.slice(1)) {
+    const m = l.match(/^[^\w*]{0,6}\*([^*]{6,120})\*\s*$/u);
+    if (m && !/R\$|link|ativos|ideal|por:/i.test(m[1])) return m[1].trim();
+  }
+  return null;
+}

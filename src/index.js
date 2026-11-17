@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import cron from 'node-cron';
 import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado, extrairLojaRelampago, buscarRelampagoDaLoja } from './shopee.js';
 import { conectar, acharGrupo, enviar, aoReceberMensagem, aoGuardarMensagem, idsDosGrupos } from './whatsapp.js';
-import { guardar, buscarParecida, exemplosDeEstilo, totalDoGrupo, lerExportacao, salvarAgora, CHAT_IMPORTADO } from './memoria.js';
+import { guardar, buscarParecida, exemplosDeEstilo, totalDoGrupo, lerExportacao, salvarAgora, CHAT_IMPORTADO, buscarPorLink, nomeDoProdutoNoPost } from './memoria.js';
 import { modoRedator, escolherEEscrever, escreverEscolhidos } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
@@ -192,7 +192,24 @@ async function tratarLinks(grupoId, texto, msg) {
   for (const link of links) {
     if (cancelado(minhaGeracao)) return;
     const completo = await expandirLink(link);
-    const ids = extrairIds(completo);
+    let ids = extrairIds(completo);
+
+    // Plano B: link curto de um post antigo dela → acha o produto pelo nome escrito no post
+    if (!ids && /s\.shopee\.com\.br|shope\.ee|shp\.ee/i.test(link)) {
+      const post = buscarPorLink(link, idsOficiais);
+      const nome = post && nomeDoProdutoNoPost(post.texto);
+      if (nome) {
+        console.log(`   📚 Link de um post antigo: "${nome}". Procurando nas lojas autorizadas...`);
+        const lista = await buscarProdutos({ palavraChave: nome, ordem: 1, limite: 30 }).catch(() => []);
+        const palavras = nome.toLowerCase().split(/[^a-z0-9à-ú]+/i).filter((w) => w.length > 2);
+        const nota = (p) => palavras.filter((w) => p.productName.toLowerCase().includes(w)).length;
+        const melhor = lista
+          .filter((p) => !lojas.size || lojas.has(String(p.shopId)))
+          .sort((a, b) => nota(b) - nota(a))[0];
+        if (melhor && nota(melhor) >= Math.min(2, palavras.length)) ids = { shopId: String(melhor.shopId), itemId: String(melhor.itemId) };
+        else console.log('   ⚠️  Não achei esse produto nas lojas autorizadas.');
+      }
+    }
 
     // Link da aba "ofertas relâmpago" de uma loja: tenta ler cada produto da lista
     const lojaRelampago = extrairLojaRelampago(completo);
