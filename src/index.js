@@ -53,7 +53,6 @@ function contextoDaMemoria(produtos) {
 async function coletarCandidatos(config) {
   const f = config.filtros;
   const enviados = lerEnviados();
-  const limiteTempo = Date.now() - f.naoRepetirPorDias * 86400000;
 
   // 1) Descobre o número de cada loja autorizada
   const lojasOk = new Map(); // shopId -> nome
@@ -71,7 +70,18 @@ async function coletarCandidatos(config) {
       p.precoFinal = Number(p.priceMin ?? p.price ?? 0);
       if (!lojasOk.has(String(p.shopId))) continue; // regra: só lojas autorizadas
       if (!p.offerLink || !p.precoFinal) continue;
-      if (enviados[p.itemId] > limiteTempo) continue;
+      // Já mandado? Só manda de novo se estiver MAIS BARATO que da última vez
+      const antes = enviados[p.itemId];
+      if (antes) {
+        if (typeof antes !== 'object') {
+          // registro antigo (sem preço): bloqueia só por 1 dia
+          if (Date.now() - Number(antes) < 86400000) continue;
+        } else {
+          const precoAntes = Number(antes.preco);
+          if (!(precoAntes > 0) || p.precoFinal >= precoAntes) continue;
+          p.precoAnteriorEnviado = precoAntes;
+        }
+      }
       if (p.precoFinal > f.precoMaximo) continue;
       if (Number(p.ratingStar || 5) < f.notaMinima) continue;
       candidatos.set(String(p.itemId), p);
@@ -148,7 +158,7 @@ async function rodada() {
   const enviados = lerEnviados();
   for (const { produto, mensagem } of itens) {
     await enviar(grupoId, mensagem, produto.imageUrl);
-    enviados[produto.itemId] = Date.now();
+    enviados[produto.itemId] = { ts: Date.now(), preco: produto.precoFinal };
     salvarEnviados(enviados);
     await new Promise((r) => setTimeout(r, 4000 + Math.random() * 4000));
   }

@@ -50,10 +50,9 @@
   "modeloClaude": "claude-opus-5-5",
   "relampagoMaximo": 60,
   "filtros": {
-    "maximoPorRodada": 4,
+    "maximoPorRodada": 10,
     "candidatosPorLoja": 15,
     "precoMaximo": 400,
-    "notaMinima": 4.5,
-    "naoRepetirPorDias": 7
+    "notaMinima": 4.5
   }
 }

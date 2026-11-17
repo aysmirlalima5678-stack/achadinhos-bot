@@ -26,6 +26,10 @@ Priorize qualidade em vez de quantidade: poucas ofertas boas valem mais que muit
 - Explique os benefícios de forma clara e útil, sem exagero.
 - Use exatamente o preço e o link informados. Nunca escreva "preço a confirmar". Não compare com preços de outras lojas: você não tem esses dados.
 
+## Produto que voltou mais barato
+Se o produto vier com "baixouDe", ele já foi enviado antes por um preço maior. Isso é uma ótima oportunidade:
+destaque na chamada que o preço baixou (ex.: *Baixou ainda mais!*), sem escrever o preço antigo como se fosse atual.
+
 ## Formato da mensagem (o formato REAL dela, nesta ordem)
 1. Chamada em negrito, curta e com personalidade, seguida de emojis. Ex.: *Olha esse preço no hidratante da DR. ALTHEA!!*🤯🚨
    Destaque o diferencial ou a oportunidade. Nunca genérica (nada de "OFERTA K-BEAUTY").
@@ -90,6 +94,7 @@ function montarEntrada(candidatos) {
     vendidos: p.sales,
     link: p.offerLink,
     ...(p.mensagemAnterior ? { mensagemAnteriorNoGrupo: p.mensagemAnterior } : {}),
+    ...(p.precoAnteriorEnviado ? { baixouDe: `R$ ${Number(p.precoAnteriorEnviado).toFixed(2).replace('.', ',')}` } : {}),
   }));
   return `Produtos candidatos de hoje (JSON):\n${JSON.stringify(lista, null, 2)}`;
 }
