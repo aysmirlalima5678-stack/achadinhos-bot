@@ -80,6 +80,8 @@ Abra o Termux e cole `./robo.sh` de novo. Só isso.
 ## Mandar links para o robô (ofertas relâmpago e outras)
 Com o robô ligado (`./robo.sh`), **cole um link da Shopee no grupo Crônicas da Milla**:
 - **Link de um produto** → o robô responde com o rascunho pronto, já com o seu link de afiliada.
+  Use o **link completo** (o da barra de endereço do Chrome, que começa com `shopee.com.br/`).
+  Links curtos `s.shopee.com.br/...` (do botão Compartilhar do app) não funcionam: a Shopee só abre eles dentro do navegador.
   Pode colar vários links numa mensagem só.
 - Escreva **"relâmpago"** junto com os links → as mensagens saem como oferta relâmpago ⚡.
 - **Link da aba de ofertas relâmpago de uma loja** (ex.: shopee.com.br/shop/123/flash-sale) → o robô tenta

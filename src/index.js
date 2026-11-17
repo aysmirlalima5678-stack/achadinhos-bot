@@ -218,6 +218,17 @@ async function tratarLinks(grupoId, texto, msg) {
       if (ok) continue; // se não deu para ler a lista, cai no link de afiliada da lista (abaixo)
     }
 
+    if (!ids && /s\.shopee\.com\.br|shope\.ee|shp\.ee/i.test(completo)) {
+      // Link curto que não deu para abrir (a Shopee só resolve dentro do navegador)
+      await enviar(grupoId, [
+        '⚠️ Não consegui descobrir qual é o produto desse link curto (s.shopee.com.br).',
+        '',
+        'Para eu fazer o rascunho, mande o *link completo*: abra o produto no Chrome e copie o endereço da barra',
+        '(começa com shopee.com.br/ e tem o nome do produto).',
+      ].join('\n'), null, msg);
+      continue;
+    }
+
     if (!ids) {
       // Link de lista (ofertas relâmpago da loja, página da loja, cupom...): vira link de afiliada
       try {
