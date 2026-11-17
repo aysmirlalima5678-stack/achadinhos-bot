@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Instala tudo o que o robô precisa num Ubuntu (servidor ou Ubuntu dentro do Termux, no tablet).
 set -e
+export DEBIAN_FRONTEND=noninteractive TZ=America/Sao_Paulo
 # Se já for administrador (root), não precisa de "sudo"
-if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
+if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo -E"; fi
 
 # Máquinas pequenas precisam de "memória extra" (swap). No tablet isso não é possível e é pulado.
 if [ "$(free -m | awk '/^Mem:/{print $2}')" -lt 3000 ] && ! swapon --show 2>/dev/null | grep -q /swapfile; then
