@@ -197,7 +197,7 @@ async function tratarLinks(grupoId, texto, msg) {
     if (!m) continue;
     const pix = m[2].match(/pix=([\d.,]+)/i);
     const cartao = m[2].match(/cartao=([\d.,]+)/i);
-    precosPorNome.push({ nome: m[1], pix: pix && numero(pix[1]), cartao: cartao && numero(cartao[1]) });
+    precosPorNome.push({ nome: m[1], pix: pix && numero(pix[1]), cartao: cartao && numero(cartao[1]), esgotado: /esgotado/i.test(m[2]) });
   }
   const palavras = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
   const precoPeloNome = (nomeProduto) => {
@@ -289,6 +289,7 @@ async function tratarLinks(grupoId, texto, msg) {
     }
     p.precoFinal = Number(p.priceMin ?? p.price ?? 0);
     const pg = precosDaPagina[String(p.itemId)] || precoPeloNome(p.productName);
+    if (pg?.esgotado) { console.log(`   ⏭️  Esgotado, pulei: ${p.productName.slice(0, 50)}`); continue; }
     if (pg) {
       // O preço que aparece na página é o que a cliente vai ver: ele manda
       if (pg.cartao > 0) p.precoFinal = pg.cartao;
