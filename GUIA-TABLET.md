@@ -88,19 +88,19 @@ Com o robô ligado (`./robo.sh`), **cole um link da Shopee no grupo Crônicas da
 - **Outros links de lista** (página da loja, cupom) → o robô responde com o **seu link de afiliada**.
 - Produto de loja que não está na lista autorizada → o robô avisa e não faz o rascunho.
 
-## Atalho "selecionar" no Chrome (escolher os produtos da oferta relâmpago)
-A Shopee bloqueia o robô de abrir a lista sozinho, e a página não diferencia os produtos da relâmpago dos outros.
-Então você escolhe, e o atalho copia os links.
-
+## Atalho "relampago" no Chrome (copia só os produtos de "Disponível agora")
 **Criar o atalho (uma vez só):**
-1. Copie o código do arquivo `atalho-selecionar.txt` (começa com `javascript:`).
+1. Copie o código do arquivo `atalho-relampago.txt` (começa com `javascript:`).
 2. No Chrome: ⋮ → ☆ em qualquer site → ⋮ → **Favoritos** → toque e segure no favorito novo → **Editar**.
-3. **Nome:** `selecionar` · **URL:** apague tudo e cole o código. Salve.
+3. **Nome:** `relampago` · **URL:** apague tudo e cole o código. Salve.
 
 **Usar:**
-1. Abra a aba de ofertas relâmpago da loja (modo computador) e role até o fim.
-2. Toque na barra de endereço, digite `selecionar` e toque na sugestão com a ☆.
-3. Aparece um botão **＋** em cada produto. Toque no ＋ dos que estão na relâmpago (ficam verdes ✓).
-4. Toque em **Copiar X selecionados** e cole no grupo **Crônicas da Milla**. O robô faz um rascunho para cada um ⚡.
+1. Abra a aba de ofertas relâmpago da loja (modo computador) e espere aparecer "Disponível agora · Termina em".
+2. Toque na barra de endereço, digite `relampago` e toque na sugestão com a ☆.
+3. Aparece "X produtos da oferta relâmpago copiados". Confira se o número bate com a página.
+4. Cole no grupo **Crônicas da Milla**. O robô faz um rascunho para cada um ⚡.
 
 **Para interromper os envios:** escreva **parar** no grupo Crônicas da Milla.
+
+> O atalho `selecionar` (arquivo `atalho-selecionar.txt`) continua disponível para escolher produtos à mão
+> em outras páginas da loja.
