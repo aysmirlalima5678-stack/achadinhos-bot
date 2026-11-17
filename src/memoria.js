@@ -93,19 +93,18 @@ export function buscarParecida(nomeProduto, chats) {
   const alvo = [...new Set(palavrasChave(nomeProduto))];
   if (alvo.length < 2) return null;
   const set = new Set(chats);
-  let melhor = null;
-  let melhorNota = 0;
+  const notas = [];
   for (const m of carregar().msgs) {
     if (!set.has(m.chat)) continue;
     const ps = new Set(limpar(m.texto.slice(0, 500)).split(' '));
     const comum = alvo.filter((w) => ps.has(w)).length;
     const nota = comum / alvo.length;
-    if (comum >= 2 && (nota > melhorNota || (nota === melhorNota && melhor && m.ts > melhor.ts))) {
-      melhor = m;
-      melhorNota = nota;
-    }
+    if (comum >= 2 && nota >= 0.6) notas.push({ m, nota });
   }
-  return melhorNota >= 0.6 ? melhor : null;
+  if (!notas.length) return null;
+  // Entre os posts que batem quase tão bem quanto o melhor, fica com o MAIS RECENTE
+  const melhor = Math.max(...notas.map((x) => x.nota));
+  return notas.filter((x) => x.nota >= melhor - 0.15).sort((a, b) => b.m.ts - a.m.ts)[0].m;
 }
 
 /** Mensagens recentes dela no grupo oficial, para servir de exemplo de estilo. */

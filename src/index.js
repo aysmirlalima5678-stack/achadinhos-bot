@@ -6,7 +6,7 @@ import cron from 'node-cron';
 import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado, extrairLojaRelampago, buscarRelampagoDaLoja } from './shopee.js';
 import { conectar, acharGrupo, enviar, aoReceberMensagem, aoGuardarMensagem, idsDosGrupos } from './whatsapp.js';
 import { guardar, buscarParecida, exemplosDeEstilo, totalDoGrupo, lerExportacao, salvarAgora, CHAT_IMPORTADO, buscarPorLink, nomeDoProdutoNoPost } from './memoria.js';
-import { modoRedator, escolherEEscrever, escreverEscolhidos } from './redator.js';
+import { modoRedator, escolherEEscrever, escreverEscolhidos, temDoisPrecos } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
 const ARQ_ENVIADOS = 'enviados.json';
@@ -21,10 +21,13 @@ const reais = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', curr
 
 // Mensagem simples, usada só se não houver chave do Claude configurada.
 function mensagemSimples(p) {
+  const precos = temDoisPrecos(p)
+    ? [`💰 *Por: ${reais(p.precoPix)} no Pix*`, `💳 *${reais(p.precoCartao)} no cartão*`]
+    : [`💰 *Por: ${reais(p.precoFinal)}*`];
   return [
     `💗 *${p.productName.trim()}*`,
     '',
-    `💰 *Por: ${reais(p.precoFinal)}*`,
+    ...precos,
     '✈️ *Impostos calculados no carrinho*',
     '',
     `🛒 *Link:* ${p.offerLink}`,
@@ -185,6 +188,15 @@ async function tratarLinks(grupoId, texto, msg) {
   }
   const config = lerConfig();
   const relampago = /rel[aâ]mpago|flash/i.test(texto);
+  const numero = (t) => Number(String(t).replace(/\./g, '').replace(',', '.'));
+  const precosDaPagina = {};
+  for (const linha of texto.split('\n')) {
+    const ids = extrairIds(linha);
+    if (!ids) continue;
+    const pix = linha.match(/pix=([\d.,]+)/i);
+    const cartao = linha.match(/cartao=([\d.,]+)/i);
+    if (pix || cartao) precosDaPagina[ids.itemId] = { pix: pix && numero(pix[1]), cartao: cartao && numero(cartao[1]) };
+  }
   const lojas = await carregarLojasAutorizadas(config);
   console.log(`\n🔗 Recebi ${links.length} link(s) no grupo${relampago ? ' (relâmpago)' : ''}.`);
 
@@ -255,6 +267,15 @@ async function tratarLinks(grupoId, texto, msg) {
       continue;
     }
     p.precoFinal = Number(p.priceMin ?? p.price ?? 0);
+    const pg = precosDaPagina[String(p.itemId)];
+    if (pg) {
+      // O preço que aparece na página é o que a cliente vai ver: ele manda
+      if (pg.cartao > 0) p.precoFinal = pg.cartao;
+      p.precoPix = pg.pix || 0;
+      p.precoCartao = pg.cartao || 0;
+      // Só achou o preço do Pix na página: o preço normal (cartão) é o da API
+      if (pg.pix > 0 && !(pg.cartao > 0)) p.precoCartao = p.precoFinal;
+    }
     produtos.push(p);
   }
   if (!produtos.length) return;

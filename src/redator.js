@@ -37,6 +37,10 @@ Priorize qualidade em vez de quantidade: poucas ofertas boas valem mais que muit
 5. 🌿 *Ativos principais*: ativo • ativo • ativo  (os 2 a 5 mais importantes, separados por " • ")
 6. 💆‍♀️ *Ideal para*: uma linha curta e direta.
 7. 💰 *Por: R$ XX,XX*  (pode terminar com um emoji, ex.: 🔥 ou 🤯)
+   Se o produto vier com "precoPix" E "precoCartao" (dois preços diferentes), escreva DUAS linhas:
+   💰 *Por: R$ (precoPix) no Pix*
+   💳 *R$ (precoCartao) no cartão*
+   Se vier um preço só, use uma linha só, sem falar de Pix ou cartão.
 8. ✈️ *Impostos calculados no carrinho*
    (Ela costuma escrever "Impostos já incluídos" porque confere o carrinho; você NÃO confere, então use SEMPRE esta linha.)
 9. 🛒 *Link:* [link]
@@ -80,6 +84,7 @@ function montarEntrada(candidatos) {
     nome: p.productName,
     loja: p.shopName,
     preco: `R$ ${p.precoFinal.toFixed(2).replace('.', ',')}`,
+    ...(temDoisPrecos(p) ? { precoPix: reaisBR(p.precoPix), precoCartao: reaisBR(p.precoCartao) } : {}),
     desconto: `${p.priceDiscountRate || 0}%`,
     nota: p.ratingStar,
     vendidos: p.sales,
@@ -170,6 +175,10 @@ mensagem nova no estilo dela. Nunca copie preço nem link da mensagem antiga.`;
 
 let relampagoAtual = false;
 
+const reaisBR = (v) => (Number.isInteger(Number(v)) ? `R$ ${Number(v)}` : `R$ ${Number(v).toFixed(2).replace('.', ',')}`);
+/** Só tem "dois preços" quando o Pix é realmente mais barato que o cartão. */
+export const temDoisPrecos = (p) => p.precoPix > 0 && p.precoCartao > 0 && p.precoPix < p.precoCartao;
+
 /**
  * Pega o post antigo dela e troca SÓ: preço, link, linha do imposto e cupons (que podem não valer mais).
  * O resto fica exatamente como ela escreveu.
@@ -184,11 +193,16 @@ export function atualizarPostAntigo(antigo, produto, relampago = false) {
     .map((l) => {
       if (!trocouPreco && /R\$\s*[\d.]+(?:,\d{1,2})?/.test(l) && /por|💰/i.test(l)) {
         trocouPreco = true;
+        if (temDoisPrecos(produto)) {
+          return `💰 *Por: ${reaisBR(produto.precoPix)} no Pix*\n💳 *${reaisBR(produto.precoCartao)} no cartão*`;
+        }
         return l.replace(/R\$\s*[\d.]+(?:,\d{1,2})?/, preco);
       }
+      if (/^\W*💳/.test(l)) return null; // linha de cartão antiga: o preço novo já vai na linha acima
       if (/imposto/i.test(l)) return '✈️ *Impostos calculados no carrinho*';
       return l.replace(/https?:\/\/\S*(?:shopee\.com\.br|shope\.ee|shp\.ee)\S*/gi, produto.offerLink);
-    });
+    })
+    .filter((l) => l !== null);
   let texto = linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   if (!trocouPreco) texto += `\n\n💰 *Por: ${preco}*`;
   if (!texto.includes(produto.offerLink)) texto += `\n\n🛒 *Link:* ${produto.offerLink}`;
