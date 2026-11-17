@@ -96,6 +96,7 @@ export async function expandirLink(texto) {
     try { x += ' ' + decodeURIComponent(x); } catch {}
     try { x += ' ' + decodeURIComponent(x); } catch {}
     const m = x.match(/-i\.(\d+)\.(\d+)/) || x.match(/\/product\/(\d+)\/(\d+)/)
+      || x.match(/\/(?:opaanlp|universal-link\/product|an_redir\/product)\/(\d+)\/(\d+)/)
       || x.match(/shopid[="':\s]+(\d+)[^\d]{1,40}itemid[="':\s]+(\d+)/i);
     if (m) return `https://shopee.com.br/product/${m[1]}/${m[2]}`;
     const n = x.match(/itemid[="':\s]+(\d+)[^\d]{1,40}shopid[="':\s]+(\d+)/i);
@@ -113,6 +114,11 @@ export async function expandirLink(texto) {
       const html = await r.text();
       const noHtml = achar(html.slice(0, 200000));
       if (noHtml) { console.log(`   🔗 link curto → ${noHtml}`); return noHtml; }
+      // Redirecionamento escondido na página (meta refresh ou JavaScript)
+      const escondido = html.match(/url=['"]?(https?:\/\/[^'"\s>]+)/i) || html.match(/location(?:\.href)?\s*=\s*['"](https?:\/\/[^'"]+)/i);
+      if (escondido && escondido[1] !== url) { url = escondido[1].replace(/&amp;/g, '&'); caminho.push(url); continue; }
+      const urls = [...new Set(html.match(/https?:\/\/[a-z0-9.-]*shopee[^"'\s<>]{0,120}/gi) || [])].slice(0, 4);
+      console.log(`   (status ${r.status}; endereços na página: ${urls.join(' | ') || 'nenhum'})`);
       break;
     }
     console.log(`   ⚠️  Não descobri o produto do link curto. Caminho: ${caminho.join(' → ').slice(0, 300) || '(sem redirecionamento)'}`);
