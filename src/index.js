@@ -27,7 +27,7 @@ function mensagemSimples(p) {
     '👇 Aproveite aqui:',
     p.offerLink,
     '',
-    '✈️ Impostos já inclusos',
+    '✈️ Compra internacional: impostos calculados no carrinho',
   ].join('\n');
 }
 
