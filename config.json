@@ -48,6 +48,7 @@
   "palavrasChave": [],
   "redator": "assinatura",
   "modeloClaude": "claude-opus-5-5",
+  "relampagoMaximo": 60,
   "filtros": {
     "maximoPorRodada": 4,
     "candidatosPorLoja": 15,

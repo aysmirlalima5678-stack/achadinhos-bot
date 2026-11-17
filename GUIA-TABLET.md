@@ -85,7 +85,7 @@ Com o robô ligado (`./robo.sh`), **cole um link da Shopee no grupo Crônicas da
   Pode colar vários links numa mensagem só.
 - Escreva **"relâmpago"** junto com os links → as mensagens saem como oferta relâmpago ⚡.
 - **Link da aba de ofertas relâmpago de uma loja** (ex.: shopee.com.br/shop/123/flash-sale) → o robô tenta
-  abrir a lista e manda **um rascunho para cada produto** (até 15). Se a Shopee bloquear, ele avisa e manda
+  abrir a lista e manda **um rascunho para cada produto** (até 60). Se a Shopee bloquear, ele avisa e manda
   o seu link de afiliada da lista inteira.
 - **Outros links de lista** (página da loja, cupom) → o robô responde com o **seu link de afiliada**.
 - Produto de loja que não está na lista autorizada → o robô avisa e não faz o rascunho.
