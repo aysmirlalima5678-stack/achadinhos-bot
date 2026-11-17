@@ -87,3 +87,18 @@ Com o robô ligado (`./robo.sh`), **cole um link da Shopee no grupo Crônicas da
   o seu link de afiliada da lista inteira.
 - **Outros links de lista** (página da loja, cupom) → o robô responde com o **seu link de afiliada**.
 - Produto de loja que não está na lista autorizada → o robô avisa e não faz o rascunho.
+
+## Atalho "relampago" no Chrome (copia todos os produtos da aba de ofertas relâmpago)
+A Shopee bloqueia o robô de abrir a lista sozinho. Então o Chrome do tablet copia os links para você.
+
+**Criar o atalho (uma vez só):**
+1. Copie o código do arquivo `atalho-relampago.txt` (começa com `javascript:`).
+2. No Chrome, abra qualquer site e toque em ⋮ → ☆ (adicionar aos favoritos).
+3. ⋮ → **Favoritos** → toque e segure no favorito novo → **Editar**.
+4. **Nome:** `relampago` · **URL:** apague tudo e cole o código. Salve.
+
+**Usar:**
+1. Abra a aba de ofertas relâmpago da loja (modo computador) e **role até o fim**, para todos os produtos aparecerem.
+2. Toque na barra de endereço, digite `relampago` e toque na sugestão com a ☆ (o favorito).
+3. Vai aparecer "X produtos copiados!".
+4. No WhatsApp, **cole no grupo Crônicas da Milla** e envie. O robô faz um rascunho para cada produto ⚡.

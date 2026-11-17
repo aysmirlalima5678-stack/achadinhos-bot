@@ -199,20 +199,29 @@ async function tratarLinks(grupoId, texto, msg) {
   }
   if (!produtos.length) return;
 
-  let itens;
+  if (produtos.length > 3) {
+    await enviar(grupoId, `${relampago ? '⚡ ' : ''}Recebi ${produtos.length} produtos. Preparando os rascunhos...`, null, msg);
+  }
   const modo = modoRedator(config);
-  try {
-    if (modo === 'simples') throw new Error('modo simples');
-    itens = await escreverEscolhidos(produtos, { modelo: config.modeloClaude, modo, relampago });
-  } catch (e) {
-    console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
-    itens = produtos.map((p) => ({ produto: p, mensagem: mensagemSimples(p) }));
+  let total = 0;
+  // Escreve em grupos de 5, para não ficar pesado
+  for (let i = 0; i < produtos.length; i += 5) {
+    const lote = produtos.slice(i, i + 5);
+    let itens;
+    try {
+      if (modo === 'simples') throw new Error('modo simples');
+      itens = await escreverEscolhidos(lote, { modelo: config.modeloClaude, modo, relampago });
+    } catch (e) {
+      console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
+      itens = lote.map((p) => ({ produto: p, mensagem: (relampago ? '⚡ *Oferta relâmpago*\n\n' : '') + mensagemSimples(p) }));
+    }
+    for (const { produto, mensagem } of itens) {
+      await enviar(grupoId, mensagem, produto.imageUrl, produtos.length <= 3 ? msg : undefined);
+      total++;
+      await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
+    }
   }
-  for (const { produto, mensagem } of itens) {
-    await enviar(grupoId, mensagem, produto.imageUrl, msg);
-    await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
-  }
-  console.log(`✅ ${itens.length} rascunho(s) feitos a partir dos links.`);
+  console.log(`✅ ${total} rascunho(s) feitos a partir dos links.`);
 }
 
 /**
