@@ -59,6 +59,7 @@ const Resposta = z.object({
       itemId: z.string().describe('itemId do produto escolhido, exatamente como veio na lista'),
       motivo: z.string().describe('Por que entrou: qualidade, oportunidade ou lançamento, em uma frase'),
       mensagem: z.string().describe('A mensagem pronta para o WhatsApp'),
+      mesmoProdutoDoPostAntigo: z.boolean().describe('true SÓ se o produto tem mensagemAnteriorNoGrupo e ela é exatamente do MESMO produto (mesma versão)'),
     }),
   ),
 });
@@ -159,14 +160,46 @@ ${exemplos.map((e, i) => `--- exemplo ${i + 1} ---\n${e}`).join('\n')}
   if (temAnterior) {
     t += `\n\n## Produto que ela já postou antes
 Alguns produtos vêm com "mensagemAnteriorNoGrupo": é uma mensagem dela no grupo oficial que parece ser do mesmo produto.
-Se for MESMO o mesmo produto, reaproveite essa mensagem quase igual: mantenha o texto dela e troque só o preço, o link
-e o que mudou (por exemplo, se agora é oferta relâmpago). Se for outro produto (outra versão, outro tamanho, outra marca), ignore.
-Nunca copie preço nem link da mensagem antiga.`;
+Se for EXATAMENTE o mesmo produto (mesma versão), marque mesmoProdutoDoPostAntigo = true: o robô vai reaproveitar
+a mensagem dela letra por letra, trocando só preço, link e imposto. Atenção a versões parecidas (ex.: Relief Sun
+"Rice + Probiotics" e Relief Sun "Aqua-Fresh" são produtos diferentes): nesse caso marque false e escreva uma
+mensagem nova no estilo dela. Nunca copie preço nem link da mensagem antiga.`;
   }
   return t;
 }
 
-export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extra = '', exemplos = [] }) {
+let relampagoAtual = false;
+
+/**
+ * Pega o post antigo dela e troca SÓ: preço, link, linha do imposto e cupons (que podem não valer mais).
+ * O resto fica exatamente como ela escreveu.
+ */
+export function atualizarPostAntigo(antigo, produto, relampago = false) {
+  const v = Number(produto.precoFinal);
+  const preco = Number.isInteger(v) ? `R$ ${v}` : `R$ ${v.toFixed(2).replace('.', ',')}`;
+  let linhas = String(antigo).split('\n');
+  let trocouPreco = false;
+  linhas = linhas
+    .filter((l) => !/🎟️|cupom|% ?off/i.test(l)) // cupons antigos podem não valer mais
+    .map((l) => {
+      if (!trocouPreco && /R\$\s*[\d.]+(?:,\d{1,2})?/.test(l) && /por|💰/i.test(l)) {
+        trocouPreco = true;
+        return l.replace(/R\$\s*[\d.]+(?:,\d{1,2})?/, preco);
+      }
+      if (/imposto/i.test(l)) return '✈️ *Impostos calculados no carrinho*';
+      return l.replace(/https?:\/\/\S*(?:shopee\.com\.br|shope\.ee|shp\.ee)\S*/gi, produto.offerLink);
+    });
+  let texto = linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!trocouPreco) texto += `\n\n💰 *Por: ${preco}*`;
+  if (!texto.includes(produto.offerLink)) texto += `\n\n🛒 *Link:* ${produto.offerLink}`;
+  if (!/imposto/i.test(texto)) texto += '\n✈️ *Impostos calculados no carrinho*';
+  if (relampago && !/rel[aâ]mpago/i.test(texto)) texto += '\n\n*Promoção Relâmpago*🚨';
+  if (!relampago) texto = texto.split('\n').filter((l) => !/^\W*\*?promo[cç][aã]o rel[aâ]mpago/i.test(l.trim())).join('\n').trim();
+  return texto;
+}
+
+export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extra = '', exemplos = [], relampago = false }) {
+  relampagoAtual = relampago;
   const memoria = blocoMemoria(exemplos, candidatos.some((p) => p.mensagemAnterior));
   const system = REGRAS.replace('{{MAX}}', String(maximo)) + (extra ? `\n\n${extra}` : '') + (memoria ? `\n\n${memoria}` : '');
   const entrada = montarEntrada(candidatos);
@@ -178,7 +211,15 @@ export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extr
   return (saida.escolhidos || [])
     .filter((e) => porId.has(e.itemId))
     .slice(0, maximo)
-    .map((e) => ({ produto: porId.get(e.itemId), motivo: e.motivo, mensagem: e.mensagem }));
+    .map((e) => {
+      const produto = porId.get(e.itemId);
+      const reaproveitar = e.mesmoProdutoDoPostAntigo && produto.mensagemAnterior;
+      return {
+        produto,
+        motivo: reaproveitar ? `${e.motivo} (reaproveitei o post antigo)` : e.motivo,
+        mensagem: reaproveitar ? atualizarPostAntigo(produto.mensagemAnterior, produto, relampagoAtual) : e.mensagem,
+      };
+    });
 }
 
 /**
@@ -192,5 +233,5 @@ Continua proibido inventar: se não souber com segurança os ativos de algum pro
   if (relampago) {
     extra += `\nEstes produtos estão em OFERTA RELÂMPAGO (por tempo limitado): comece a chamada com ⚡ e deixe claro que é relâmpago.`;
   }
-  return escolherEEscrever(produtos, { maximo: produtos.length, modelo, modo, extra, exemplos });
+  return escolherEEscrever(produtos, { maximo: produtos.length, modelo, modo, extra, exemplos, relampago });
 }
