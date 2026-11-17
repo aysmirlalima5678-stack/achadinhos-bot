@@ -55,10 +55,10 @@ Depois siga, do guia principal (GUIA.md), os passos:
 ## PARTE 5: Deixar o robô ligado
 Saia do Ubuntu, digitando `exit` e apertando Enter, até voltar ao Termux normal (o começo da linha deixa de ser `root@localhost`). Então cole **uma vez só**:
 ```bash
-echo 'termux-wake-lock; proot-distro login ubuntu -- bash -lc "cd /root/achadinhos-bot && while true; do node src/index.js; echo Reiniciando em 10s...; sleep 10; done"' > ~/robo.sh && chmod +x ~/robo.sh
+echo 'termux-wake-lock; proot-distro login ubuntu -- bash -lc "cd /root/achadinhos-bot && git pull -q; while true; do node src/index.js; echo Reiniciando em 10s...; sleep 10; done"' > ~/robo.sh && chmod +x ~/robo.sh
 ```
 
-A partir de agora, **para ligar o robô**, abra o Termux e cole:
+A partir de agora, **para ligar o robô**, abra o Termux e cole (ele já baixa sozinho as atualizações do robô antes de ligar):
 ```bash
 ./robo.sh
 ```
