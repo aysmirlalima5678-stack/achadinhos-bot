@@ -63,9 +63,17 @@ export async function buscarProdutos({ shopId, palavraChave, ordem = 2, limite =
   if (shopId) args.push(`shopId: ${Number(shopId)}`);
   if (palavraChave) args.push(`keyword: ${JSON.stringify(String(palavraChave))}`);
   args.push(`sortType: ${Number(ordem)}`, 'page: 1', `limit: ${Number(limite)}`);
-  const query = `{ productOfferV2(${args.join(', ')}) { nodes { ${CAMPOS} } } }`;
-  const data = await chamarApi(query);
-  return data?.productOfferV2?.nodes ?? [];
+  const montar = (a) => `{ productOfferV2(${a.join(', ')}) { nodes { ${CAMPOS} } } }`;
+  try {
+    const data = await chamarApi(montar(args));
+    return data?.productOfferV2?.nodes ?? [];
+  } catch (e) {
+    // Algumas combinações dão "System Error" na Shopee: tenta de novo sem a ordenação
+    if (!/10000|System Error/i.test(e.message)) throw e;
+    const semOrdem = args.filter((x) => !x.startsWith('sortType'));
+    const data = await chamarApi(montar(semOrdem));
+    return data?.productOfferV2?.nodes ?? [];
+  }
 }
 
 /** Transforma qualquer link da Shopee em link curto de afiliado. */

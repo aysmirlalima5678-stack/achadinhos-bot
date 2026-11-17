@@ -63,7 +63,7 @@ async function coletarCandidatos(config) {
   // 2) Produtos de cada loja (mais vendidos + maior desconto/relevância)
   for (const [shopId, nome] of lojasOk) {
     let total = 0, nomeShopee = '';
-    for (const ordem of [2, 1]) {
+    for (const ordem of [1, 5]) { // 1 = relevância, 5 = maior comissão
       try {
         const lista = await buscarProdutos({ shopId, ordem, limite: f.candidatosPorLoja });
         total += lista.length;
@@ -71,11 +71,21 @@ async function coletarCandidatos(config) {
         considerar(lista);
       } catch (e) { console.log(`⚠️  ${nome}: ${e.message}`); }
     }
+    if (!total) {
+      // Plano B: busca pelo nome da loja e fica só com os produtos dessa loja
+      try {
+        const lista = (await buscarProdutos({ palavraChave: nome, ordem: 1, limite: 50 }))
+          .filter((p) => String(p.shopId) === String(shopId));
+        total = lista.length;
+        nomeShopee ||= lista[0]?.shopName || '';
+        considerar(lista);
+      } catch (e) { console.log(`⚠️  ${nome} (busca pelo nome): ${e.message}`); }
+    }
     console.log(`🏪 ${nome}: ${total} produtos${nomeShopee ? ` (na Shopee: "${nomeShopee}")` : ''}`);
   }
   // 3) Palavras-chave (resultado filtrado para as lojas autorizadas)
   for (const palavra of config.palavrasChave || []) {
-    try { considerar(await buscarProdutos({ palavraChave: palavra, ordem: 2, limite: 50 })); }
+    try { considerar(await buscarProdutos({ palavraChave: palavra, ordem: 1, limite: 50 })); }
     catch (e) { console.log(`⚠️  "${palavra}": ${e.message}`); }
   }
 
