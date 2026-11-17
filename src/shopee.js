@@ -197,3 +197,53 @@ export async function buscarProdutoPorId({ shopId, itemId }) {
   const data = await chamarApi(query);
   return data?.productOfferV2?.nodes?.[0] ?? null;
 }
+
+/** Se for link da aba de ofertas relâmpago de uma loja, devolve o número da loja. */
+export function extrairLojaRelampago(texto) {
+  const s = String(texto || '');
+  if (!/flash[-_]?sale/i.test(s)) return null;
+  const m = s.match(/\/shop\/(\d+)/) || s.match(/shopi?d=(\d+)/i);
+  return m ? m[1] : null;
+}
+
+/**
+ * Lê os produtos da oferta relâmpago de uma loja, pelo mesmo caminho que o site da Shopee usa.
+ * NÃO é a API oficial: a Shopee pode bloquear. Devolve { sessao, itens:[{shopId,itemId,precoRelampago}] }.
+ */
+export async function buscarRelampagoDaLoja(shopId) {
+  const url = `https://shopee.com.br/api/v4/shop/get_shop_flash_sale_items?shopid=${Number(shopId)}`;
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 14; SM-P613) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      Accept: 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-API-SOURCE': 'pc',
+      'X-Shopee-Language': 'pt-BR',
+      Referer: `https://shopee.com.br/shop/${Number(shopId)}/flash-sale`,
+    },
+  });
+  const texto = await r.text();
+  let j;
+  try { j = JSON.parse(texto); } catch { throw new Error(`a Shopee não devolveu a lista (HTTP ${r.status})`); }
+  const sessoes = j?.data?.flash_sales;
+  if (!Array.isArray(sessoes)) {
+    throw new Error(`a Shopee bloqueou a leitura da lista (código ${j?.error ?? r.status})`);
+  }
+  if (!sessoes.length) return { sessao: null, itens: [] };
+
+  const agora = Date.now() / 1000;
+  const sessao =
+    sessoes.find((x) => x.start_time <= agora && (!x.end_time || agora < x.end_time)) ||
+    sessoes.slice().sort((a, b) => a.start_time - b.start_time).find((x) => x.start_time > agora) ||
+    sessoes[0];
+  const itens = (sessao.items || []).map((it) => {
+    const bruto = Number(it.price ?? it.flash_sale_price ?? 0);
+    return {
+      shopId: String(it.shop_id ?? it.shopid ?? shopId),
+      itemId: String(it.item_id ?? it.itemid),
+      precoRelampago: bruto > 0 ? bruto / 100000 : null, // a Shopee guarda preço x 100000
+    };
+  }).filter((x) => x.itemId && x.itemId !== 'undefined');
+  if (itens[0]) console.log('   (relâmpago) exemplo de item:', JSON.stringify(sessao.items[0]).slice(0, 300));
+  return { sessao: { inicio: sessao.start_time, fim: sessao.end_time }, itens };
+}

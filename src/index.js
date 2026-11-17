@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import cron from 'node-cron';
-import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado } from './shopee.js';
+import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado, extrairLojaRelampago, buscarRelampagoDaLoja } from './shopee.js';
 import { conectar, acharGrupo, enviar, aoReceberMensagem } from './whatsapp.js';
 import { modoRedator, escolherEEscrever, escreverEscolhidos } from './redator.js';
 
@@ -162,6 +162,13 @@ async function tratarLinks(grupoId, texto, msg) {
     const completo = await expandirLink(link);
     const ids = extrairIds(completo);
 
+    // Link da aba "ofertas relâmpago" de uma loja: tenta ler cada produto da lista
+    const lojaRelampago = extrairLojaRelampago(completo);
+    if (lojaRelampago) {
+      const ok = await tratarListaRelampago(grupoId, lojaRelampago, completo, lojas, config, msg);
+      if (ok) continue; // se não deu para ler a lista, cai no link de afiliada da lista (abaixo)
+    }
+
     if (!ids) {
       // Link de lista (ofertas relâmpago da loja, página da loja, cupom...): vira link de afiliada
       try {
@@ -206,6 +213,70 @@ async function tratarLinks(grupoId, texto, msg) {
     await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
   }
   console.log(`✅ ${itens.length} rascunho(s) feitos a partir dos links.`);
+}
+
+/**
+ * Lê a lista de ofertas relâmpago da loja e manda um rascunho para cada produto.
+ * Devolve false se não conseguiu ler a lista (aí o robô manda só o link da lista).
+ */
+async function tratarListaRelampago(grupoId, shopId, link, lojas, config, msg) {
+  if (lojas.size && !lojas.has(String(shopId))) {
+    await enviar(grupoId, '⛔ Essa loja não está na lista de lojas autorizadas.', null, msg);
+    return true;
+  }
+  let lista;
+  try {
+    lista = await buscarRelampagoDaLoja(shopId);
+  } catch (e) {
+    console.log(`⚠️  Relâmpago: ${e.message}`);
+    await enviar(grupoId, `⚠️ Não consegui abrir a lista de ofertas relâmpago (${e.message}). Vou mandar o link da lista:`, null, msg);
+    return false;
+  }
+  if (!lista.itens.length) {
+    await enviar(grupoId, '⚡ Essa loja não tem ofertas relâmpago acontecendo agora.', null, msg);
+    return true;
+  }
+  const max = Number(config.relampagoMaximo || 15);
+  const nomeLoja = lojas.get(String(shopId)) || 'loja';
+  const hora = (t) => new Date(t * 1000).toLocaleTimeString('pt-BR', { timeZone: FUSO, hour: '2-digit', minute: '2-digit' });
+  const agora = Date.now() / 1000;
+  const quando = lista.sessao?.inicio > agora ? ` (começa às ${hora(lista.sessao.inicio)})`
+    : lista.sessao?.fim ? ` (até ${hora(lista.sessao.fim)})` : '';
+  await enviar(grupoId, `⚡ Achei ${lista.itens.length} ofertas relâmpago da ${nomeLoja}${quando}. Preparando os rascunhos de até ${max}...`, null, msg);
+
+  const produtos = [];
+  for (const it of lista.itens.slice(0, max)) {
+    const p = await buscarProdutoPorId(it).catch(() => null);
+    if (!p?.offerLink) continue;
+    const precoApi = Number(p.priceMin ?? p.price ?? 0);
+    // Usa o preço relâmpago só se fizer sentido (menor ou igual ao preço normal)
+    p.precoFinal = it.precoRelampago && (!precoApi || it.precoRelampago <= precoApi) ? it.precoRelampago : precoApi;
+    produtos.push(p);
+  }
+  if (!produtos.length) {
+    await enviar(grupoId, '⚠️ Achei a lista, mas nenhum produto dela está no programa de afiliados.', null, msg);
+    return true;
+  }
+
+  const modo = modoRedator(config);
+  // Escreve em grupos de 5, para não ficar pesado
+  for (let i = 0; i < produtos.length; i += 5) {
+    const lote = produtos.slice(i, i + 5);
+    let itens;
+    try {
+      if (modo === 'simples') throw new Error('modo simples');
+      itens = await escreverEscolhidos(lote, { modelo: config.modeloClaude, modo, relampago: true });
+    } catch (e) {
+      console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
+      itens = lote.map((p) => ({ produto: p, mensagem: '⚡ *Oferta relâmpago*\n\n' + mensagemSimples(p) }));
+    }
+    for (const { produto, mensagem } of itens) {
+      await enviar(grupoId, mensagem, produto.imageUrl);
+      await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
+    }
+  }
+  console.log(`✅ ${produtos.length} rascunhos de ofertas relâmpago enviados.`);
+  return true;
 }
 
 // Véspera de data dupla da Shopee (3/3, 4/4 ... 11/11, 12/12)
