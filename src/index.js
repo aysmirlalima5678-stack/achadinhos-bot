@@ -190,6 +190,27 @@ async function tratarLinks(grupoId, texto, msg) {
   const relampago = /rel[aâ]mpago|flash/i.test(texto);
   const numero = (t) => Number(String(t).replace(/\./g, '').replace(',', '.'));
   const precosDaPagina = {};
+  // Preços que o atalho leu na tela, por NOME do produto: "* Nome do produto | pix=97,32"
+  const precosPorNome = [];
+  for (const linha of texto.split('\n')) {
+    const m = linha.match(/^\*\s*(.+?)\s*\|(.*)$/);
+    if (!m) continue;
+    const pix = m[2].match(/pix=([\d.,]+)/i);
+    const cartao = m[2].match(/cartao=([\d.,]+)/i);
+    precosPorNome.push({ nome: m[1], pix: pix && numero(pix[1]), cartao: cartao && numero(cartao[1]) });
+  }
+  const palavras = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+  const precoPeloNome = (nomeProduto) => {
+    const alvo = new Set(palavras(nomeProduto));
+    let melhor = null, nota = 0;
+    for (const c of precosPorNome) {
+      const ws = palavras(c.nome);
+      if (!ws.length) continue;
+      const n = ws.filter((w) => alvo.has(w)).length / ws.length;
+      if (n > nota) { nota = n; melhor = c; }
+    }
+    return nota >= 0.6 ? melhor : null;
+  };
   for (const linha of texto.split('\n')) {
     const ids = extrairIds(linha);
     if (!ids) continue;
@@ -267,7 +288,7 @@ async function tratarLinks(grupoId, texto, msg) {
       continue;
     }
     p.precoFinal = Number(p.priceMin ?? p.price ?? 0);
-    const pg = precosDaPagina[String(p.itemId)];
+    const pg = precosDaPagina[String(p.itemId)] || precoPeloNome(p.productName);
     if (pg) {
       // O preço que aparece na página é o que a cliente vai ver: ele manda
       if (pg.cartao > 0) p.precoFinal = pg.cartao;
