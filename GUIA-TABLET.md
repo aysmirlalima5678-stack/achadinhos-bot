@@ -104,3 +104,18 @@ Com o robô ligado (`./robo.sh`), **cole um link da Shopee no grupo Crônicas da
 
 > O atalho `selecionar` (arquivo `atalho-selecionar.txt`) continua disponível para escolher produtos à mão
 > em outras páginas da loja.
+
+## Memória do grupo oficial (estilo e produtos já postados)
+O robô **lê** (nunca escreve) o grupo **Skincare & K-Beauty** e guarda as suas mensagens **só no tablet**
+(arquivo `memoria-grupos.json`, que não vai para o GitHub). Com isso:
+- antes de escrever um rascunho, ele procura se você já postou o mesmo produto e **reaproveita o seu texto**,
+  trocando só preço e link;
+- ele usa as suas mensagens como **exemplo de estilo** (emojis, tamanho, jeito de escrever).
+
+**Para ele aprender o histórico antigo (uma vez só):**
+1. Pare o robô (CTRL e depois c, duas vezes) até aparecer `~ $`.
+2. `proot-distro login ubuntu` e depois `cd /root/achadinhos-bot && git pull`
+3. `npm run religar` → aparece um **QR Code**.
+4. No celular do robô: WhatsApp → **Dispositivos conectados** → **Conectar um dispositivo** → aponte a câmera para o QR Code.
+5. Espere uns 3 minutos até aparecer "📚 Pronto!".
+6. `exit` e ligue de novo com `./robo.sh`.

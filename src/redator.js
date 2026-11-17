@@ -46,7 +46,7 @@ Priorize qualidade em vez de quantidade: poucas ofertas boas valem mais que muit
 Seja enxuta: corte palavras desnecessárias, mas nunca tire "Ativos principais" nem "Ideal para".
 
 ## Estilo
-- Tom feminino, natural, empolgado e informal, com emojis.
+- Tom feminino, natural, empolgado e informal. Use POUCOS emojis: siga a quantidade e os emojis dos exemplos reais dela (se houver). Sem exemplos, no máximo 5 emojis na mensagem toda.
 - NÃO comece as mensagens chamando o grupo ("meninas", "amigas"). Fale do produto direto. Só use "meninas" ou "amigas" de vez em quando, numa mensagem ou outra, quando soar natural; nunca como padrão.
 - NUNCA repita o mesmo emoji na mesma mensagem, incluindo chamada e nome do produto (atenção: 💰, 👇 e ✈️ já são usados no fim, não use de novo).
 - Mensagem curta e organizada, mas não exageradamente dividida em blocos.
@@ -84,6 +84,7 @@ function montarEntrada(candidatos) {
     nota: p.ratingStar,
     vendidos: p.sales,
     link: p.offerLink,
+    ...(p.mensagemAnterior ? { mensagemAnteriorNoGrupo: p.mensagemAnterior } : {}),
   }));
   return `Produtos candidatos de hoje (JSON):\n${JSON.stringify(lista, null, 2)}`;
 }
@@ -144,8 +145,30 @@ async function viaApi(system, entrada, modelo) {
 /**
  * Recebe os candidatos e devolve [{ produto, motivo, mensagem }].
  */
-export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extra = '' }) {
-  const system = REGRAS.replace('{{MAX}}', String(maximo)) + (extra ? `\n\n${extra}` : '');
+/** Texto extra com o estilo real dela e a regra de reaproveitar mensagens antigas. */
+function blocoMemoria(exemplos = [], temAnterior = false) {
+  let t = '';
+  if (exemplos.length) {
+    t += `## Estilo real dela (mensagens que ela mesma postou no grupo oficial)
+Estas mensagens são a referência MAIS IMPORTANTE de formato: copie o jeito dela (estrutura, quais emojis e quantos,
+tamanho, como escreve o preço e o link). Se algo nas regras acima conflitar com o jeito dela, siga o jeito dela,
+mas mantenha sempre a linha de imposto "✈️ Compra internacional: impostos calculados no carrinho" e nunca invente informação.
+${exemplos.map((e, i) => `--- exemplo ${i + 1} ---\n${e}`).join('\n')}
+--- fim dos exemplos ---`;
+  }
+  if (temAnterior) {
+    t += `\n\n## Produto que ela já postou antes
+Alguns produtos vêm com "mensagemAnteriorNoGrupo": é uma mensagem dela no grupo oficial que parece ser do mesmo produto.
+Se for MESMO o mesmo produto, reaproveite essa mensagem quase igual: mantenha o texto dela e troque só o preço, o link
+e o que mudou (por exemplo, se agora é oferta relâmpago). Se for outro produto (outra versão, outro tamanho, outra marca), ignore.
+Nunca copie preço nem link da mensagem antiga.`;
+  }
+  return t;
+}
+
+export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extra = '', exemplos = [] }) {
+  const memoria = blocoMemoria(exemplos, candidatos.some((p) => p.mensagemAnterior));
+  const system = REGRAS.replace('{{MAX}}', String(maximo)) + (extra ? `\n\n${extra}` : '') + (memoria ? `\n\n${memoria}` : '');
   const entrada = montarEntrada(candidatos);
   const saida = modo === 'api'
     ? await viaApi(system, entrada, modelo)
@@ -162,12 +185,12 @@ export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extr
  * Modo manual: ela mandou o link no grupo, então o produto JÁ FOI ESCOLHIDO.
  * Só escreve a mensagem (não descarta).
  */
-export async function escreverEscolhidos(produtos, { modelo, modo, relampago = false }) {
+export async function escreverEscolhidos(produtos, { modelo, modo, relampago = false, exemplos = [] }) {
   let extra = `## Modo manual (IMPORTANTE)
 A Aysmirla JÁ ESCOLHEU estes produtos. Escreva a mensagem de TODOS eles: não descarte nenhum e ignore o critério de escolha.
 Continua proibido inventar: se não souber com segurança os ativos de algum produto, use em "Ativos principais" só o que aparece no nome do produto.`;
   if (relampago) {
     extra += `\nEstes produtos estão em OFERTA RELÂMPAGO (por tempo limitado): comece a chamada com ⚡ e deixe claro que é relâmpago.`;
   }
-  return escolherEEscrever(produtos, { maximo: produtos.length, modelo, modo, extra });
+  return escolherEEscrever(produtos, { maximo: produtos.length, modelo, modo, extra, exemplos });
 }

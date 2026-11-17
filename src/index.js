@@ -4,7 +4,8 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import cron from 'node-cron';
 import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado, extrairLojaRelampago, buscarRelampagoDaLoja } from './shopee.js';
-import { conectar, acharGrupo, enviar, aoReceberMensagem } from './whatsapp.js';
+import { conectar, acharGrupo, enviar, aoReceberMensagem, aoGuardarMensagem, idsDosGrupos } from './whatsapp.js';
+import { guardar, buscarParecida, exemplosDeEstilo, totalDoGrupo } from './memoria.js';
 import { modoRedator, escolherEEscrever, escreverEscolhidos } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
@@ -29,6 +30,22 @@ function mensagemSimples(p) {
     '',
     '✈️ Compra internacional: impostos calculados no carrinho',
   ].join('\n');
+}
+
+// ---------- Memória do grupo oficial (só leitura) ----------
+let idsOficiais = [];
+
+/** Marca nos produtos se ela já postou o mesmo produto no grupo oficial e devolve exemplos do estilo dela. */
+function contextoDaMemoria(produtos) {
+  if (!idsOficiais.length) return [];
+  let achados = 0;
+  for (const p of produtos) {
+    if (achados >= 10) break;
+    const m = buscarParecida(p.productName, idsOficiais);
+    if (m) { p.mensagemAnterior = m.texto.slice(0, 1500); achados++; }
+  }
+  if (achados) console.log(`📚 ${achados} produto(s) já postados antes no grupo oficial: vou reaproveitar o texto.`);
+  return exemplosDeEstilo(idsOficiais, 5);
 }
 
 /** Busca os candidatos SOMENTE nas lojas autorizadas. */
@@ -102,7 +119,8 @@ async function prepararMensagens(config) {
   const modo = modoRedator(config);
   if (modo !== 'simples') {
     try {
-      const escolhidos = await escolherEEscrever(candidatos, { maximo: max, modelo: config.modeloClaude, modo });
+      const exemplos = contextoDaMemoria(candidatos);
+      const escolhidos = await escolherEEscrever(candidatos, { maximo: max, modelo: config.modeloClaude, modo, exemplos });
       escolhidos.forEach((e) => console.log(`   ✔ ${e.produto.productName.slice(0, 60)}: ${e.motivo}`));
       return escolhidos;
     } catch (e) {
@@ -227,7 +245,7 @@ async function tratarLinks(grupoId, texto, msg) {
     let itens;
     try {
       if (modo === 'simples') throw new Error('modo simples');
-      itens = await escreverEscolhidos(lote, { modelo: config.modeloClaude, modo, relampago });
+      itens = await escreverEscolhidos(lote, { modelo: config.modeloClaude, modo, relampago, exemplos: contextoDaMemoria(lote) });
     } catch (e) {
       console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
       itens = lote.map((p) => ({ produto: p, mensagem: (relampago ? '⚡ *Oferta relâmpago*\n\n' : '') + mensagemSimples(p) }));
@@ -293,7 +311,7 @@ async function tratarListaRelampago(grupoId, shopId, link, lojas, config, msg) {
     let itens;
     try {
       if (modo === 'simples') throw new Error('modo simples');
-      itens = await escreverEscolhidos(lote, { modelo: config.modeloClaude, modo, relampago: true });
+      itens = await escreverEscolhidos(lote, { modelo: config.modeloClaude, modo, relampago: true, exemplos: contextoDaMemoria(lote) });
     } catch (e) {
       console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
       itens = lote.map((p) => ({ produto: p, mensagem: '⚡ *Oferta relâmpago*\n\n' + mensagemSimples(p) }));
@@ -339,7 +357,27 @@ if (args.includes('--testar-shopee')) {
   process.exit(0);
 }
 
+// Guarda as mensagens dos grupos (inclusive o histórico que chega ao conectar)
+aoGuardarMensagem(guardar);
+
+if (args.includes('--religar')) {
+  // Reconecta do zero por QR Code, pedindo o histórico antigo dos grupos
+  fs.rmSync('sessao-whatsapp', { recursive: true, force: true });
+  process.env.MODO_QR = '1';
+}
+
 await conectar();
+idsOficiais = await idsDosGrupos(lerConfig().gruposLeitura || []).catch(() => []);
+if (idsOficiais.length) console.log(`📚 Memória do grupo oficial: ${totalDoGrupo(idsOficiais)} mensagens guardadas.`);
+
+if (args.includes('--religar')) {
+  console.log('\n⏳ Recebendo o histórico dos grupos... espere uns 3 minutos, sem mexer.');
+  await new Promise((r) => setTimeout(r, 180000));
+  console.log(`\n📚 Pronto! Memória do grupo oficial: ${totalDoGrupo(idsOficiais)} mensagens.`);
+  console.log('Agora saia (exit) e ligue o robô de novo com ./robo.sh');
+  setTimeout(() => process.exit(0), 3000);
+  await new Promise(() => {});
+}
 
 if (args.includes('--agora')) {
   await rodada();
