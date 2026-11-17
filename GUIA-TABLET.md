@@ -123,10 +123,8 @@ O robô **lê** (nunca escreve) o grupo **Skincare & K-Beauty** e guarda as suas
 ## Importar o histórico do grupo oficial (arquivo "Exportar conversa")
 1. Coloque o arquivo `_chat.txt` na pasta **Downloads** do tablet (ex.: mande para você mesma e baixe no tablet).
    Se ele vier como `.zip`, abra no app **Meus Arquivos** e extraia.
-2. No Termux, com a linha `~ $` (fora do Ubuntu), dê permissão de acesso aos arquivos (só na primeira vez):
+2. No Termux, com a linha `~ $`, dê permissão de acesso aos arquivos (só na primeira vez):
    `termux-setup-storage` → toque em **Permitir**.
-3. Copie o arquivo para a pasta do robô:
-   `cp ~/storage/downloads/_chat.txt $PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu/root/achadinhos-bot/historico.txt`
-4. Entre no Ubuntu e importe:
-   `proot-distro login ubuntu` → `cd /root/achadinhos-bot` → `npm run importar`
+3. Entre no Ubuntu: `proot-distro login ubuntu` → `cd /root/achadinhos-bot && git pull`
+4. Copie e importe: `cp /sdcard/Download/_chat.txt historico.txt && npm run importar`
 5. `exit` e ligue o robô com `./robo.sh`.
