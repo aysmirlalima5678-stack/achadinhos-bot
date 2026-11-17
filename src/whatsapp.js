@@ -11,6 +11,7 @@ import pino from 'pino';
 let sock = null;
 let pronto = false;
 let jaPediuCodigo = false; // pede o código só uma vez por execução
+let aoReceber = null; // função chamada quando chega mensagem de texto
 
 /**
  * No WhatsApp, celulares brasileiros com DDD 31 ou maior costumam ser registrados
@@ -39,6 +40,16 @@ export function conectar() {
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    // Mensagens que chegam (ex.: ela cola um link no grupo de rascunhos)
+    sock.ev.on('messages.upsert', ({ messages, type }) => {
+      if (type !== 'notify' || !aoReceber) return;
+      for (const msg of messages) {
+        if (msg.key.fromMe) continue; // ignora o que o próprio robô mandou
+        const texto = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+        if (texto) Promise.resolve(aoReceber(msg.key.remoteJid, texto, msg)).catch((e) => console.log('Erro:', e.message));
+      }
+    });
 
     sock.ev.on('connection.update', async (u) => {
       const { connection, lastDisconnect, qr } = u;
@@ -116,15 +127,18 @@ export async function acharGrupo(nome, gruposProibidos = []) {
   return achado.id;
 }
 
-export async function enviar(grupoId, texto, imagemUrl) {
+/** Registra quem trata as mensagens recebidas: fn(chatId, texto, msgOriginal). */
+export function aoReceberMensagem(fn) { aoReceber = fn; }
+
+export async function enviar(grupoId, texto, imagemUrl, responderA) {
   if (!pronto) throw new Error('WhatsApp não está conectado');
   if (imagemUrl) {
     try {
-      await sock.sendMessage(grupoId, { image: { url: imagemUrl }, caption: texto });
+      await sock.sendMessage(grupoId, { image: { url: imagemUrl }, caption: texto }, responderA ? { quoted: responderA } : {});
       return;
     } catch {
       // se a imagem falhar, manda só o texto
     }
   }
-  await sock.sendMessage(grupoId, { text: texto });
+  await sock.sendMessage(grupoId, { text: texto }, responderA ? { quoted: responderA } : {});
 }

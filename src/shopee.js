@@ -87,7 +87,7 @@ export async function gerarLinkAfiliado(url) {
  * Links curtos do botão "Compartilhar" do app (s.shopee.com.br/..., shope.ee/...)
  * não têm o número da loja. Aqui abrimos o link para descobrir o endereço completo.
  */
-async function expandirLink(texto) {
+export async function expandirLink(texto) {
   const s = String(texto || '').trim();
   if (!/^https?:\/\/(s\.shopee\.com\.br|shope\.ee|shp\.ee)\//i.test(s)) return s;
   try {
@@ -182,4 +182,18 @@ export function extrairShopId(texto) {
   if (/^\d+$/.test(s)) return s;
   const m = s.match(/-i\.(\d+)\.\d+/) || s.match(/\/product\/(\d+)\/\d+/) || s.match(/\/shop\/(\d+)/);
   return m ? m[1] : null;
+}
+
+/** Pega loja e produto de um link de produto. Ex.: ...-i.123.456 -> { shopId: '123', itemId: '456' } */
+export function extrairIds(texto) {
+  const s = String(texto || '');
+  const m = s.match(/-i\.(\d+)\.(\d+)/) || s.match(/\/product\/(\d+)\/(\d+)/);
+  return m ? { shopId: m[1], itemId: m[2] } : null;
+}
+
+/** Busca um produto específico (com o link de afiliado dela). */
+export async function buscarProdutoPorId({ shopId, itemId }) {
+  const query = `{ productOfferV2(shopId: ${Number(shopId)}, itemId: ${Number(itemId)}, page: 1, limit: 1) { nodes { ${CAMPOS} } } }`;
+  const data = await chamarApi(query);
+  return data?.productOfferV2?.nodes?.[0] ?? null;
 }

@@ -3,9 +3,9 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import cron from 'node-cron';
-import { buscarProdutos, resolverLoja } from './shopee.js';
-import { conectar, acharGrupo, enviar } from './whatsapp.js';
-import { modoRedator, escolherEEscrever } from './redator.js';
+import { buscarProdutos, resolverLoja, expandirLink, extrairIds, buscarProdutoPorId, gerarLinkAfiliado } from './shopee.js';
+import { conectar, acharGrupo, enviar, aoReceberMensagem } from './whatsapp.js';
+import { modoRedator, escolherEEscrever, escreverEscolhidos } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
 const ARQ_ENVIADOS = 'enviados.json';
@@ -136,6 +136,78 @@ async function rodada() {
   console.log(`✅ ${itens.length} rascunhos enviados para "${config.grupoRascunhos}".`);
 }
 
+// ---------- Modo manual: ela cola links da Shopee no grupo de rascunhos ----------
+const REGEX_LINK = /https?:\/\/[^\s]*(?:shopee\.com\.br|shope\.ee|shp\.ee)[^\s]*/gi;
+let lojasAutorizadas = null; // shopId -> nome
+
+async function carregarLojasAutorizadas(config) {
+  if (lojasAutorizadas) return lojasAutorizadas;
+  lojasAutorizadas = new Map();
+  for (const loja of config.lojas) {
+    try { const id = await resolverLoja(loja); if (id) lojasAutorizadas.set(String(id), loja.nome); } catch {}
+  }
+  return lojasAutorizadas;
+}
+
+async function tratarLinks(grupoId, texto, msg) {
+  const links = [...new Set(texto.match(REGEX_LINK) || [])];
+  if (!links.length) return;
+  const config = lerConfig();
+  const relampago = /rel[aâ]mpago|flash/i.test(texto);
+  const lojas = await carregarLojasAutorizadas(config);
+  console.log(`\n🔗 Recebi ${links.length} link(s) no grupo${relampago ? ' (relâmpago)' : ''}.`);
+
+  const produtos = [];
+  for (const link of links) {
+    const completo = await expandirLink(link);
+    const ids = extrairIds(completo);
+
+    if (!ids) {
+      // Link de lista (ofertas relâmpago da loja, página da loja, cupom...): vira link de afiliada
+      try {
+        const curto = await gerarLinkAfiliado(completo);
+        const ehRelampago = relampago || /flash/i.test(completo);
+        const linhas = ehRelampago
+          ? ['⚡ *Ofertas relâmpago no ar!*', '', 'Preços especiais por tempo limitado. Corre antes que acabe! ⏳', '', '👇 Veja todas aqui:', curto]
+          : ['🛍️ *Ofertas selecionadas*', '', '👇 Confira aqui:', curto];
+        linhas.push('', '✈️ Compra internacional: impostos calculados no carrinho');
+        await enviar(grupoId, linhas.join('\n'), null, msg);
+      } catch (e) {
+        await enviar(grupoId, `⚠️ Não consegui gerar o link de afiliada para este link (${e.message}).`, null, msg);
+      }
+      continue;
+    }
+
+    if (lojas.size && !lojas.has(String(ids.shopId))) {
+      await enviar(grupoId, '⛔ Esse produto não é de nenhuma loja autorizada, então não preparei o rascunho.', null, msg);
+      continue;
+    }
+    const p = await buscarProdutoPorId(ids).catch(() => null);
+    if (!p?.offerLink) {
+      await enviar(grupoId, '⚠️ Não encontrei esse produto no programa de afiliados da Shopee.', null, msg);
+      continue;
+    }
+    p.precoFinal = Number(p.priceMin ?? p.price ?? 0);
+    produtos.push(p);
+  }
+  if (!produtos.length) return;
+
+  let itens;
+  const modo = modoRedator(config);
+  try {
+    if (modo === 'simples') throw new Error('modo simples');
+    itens = await escreverEscolhidos(produtos, { modelo: config.modeloClaude, modo, relampago });
+  } catch (e) {
+    console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
+    itens = produtos.map((p) => ({ produto: p, mensagem: mensagemSimples(p) }));
+  }
+  for (const { produto, mensagem } of itens) {
+    await enviar(grupoId, mensagem, produto.imageUrl, msg);
+    await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
+  }
+  console.log(`✅ ${itens.length} rascunho(s) feitos a partir dos links.`);
+}
+
 // Véspera de data dupla da Shopee (3/3, 4/4 ... 11/11, 12/12)
 async function avisoDataDupla() {
   const amanha = new Date(new Date().toLocaleString('en-US', { timeZone: FUSO }));
@@ -181,5 +253,12 @@ if (args.includes('--agora')) {
     cron.schedule(`${min} ${hora} * * *`, executar(rodada), { timezone: FUSO });
   }
   cron.schedule('0 20 * * *', executar(avisoDataDupla), { timezone: FUSO });
+
+  // Fica "ouvindo" o grupo de rascunhos: link colado lá vira rascunho pronto
+  const grupoId = await acharGrupo(config.grupoRascunhos, config.gruposProibidos);
+  if (grupoId) {
+    aoReceberMensagem((chatId, texto, msg) => (chatId === grupoId ? tratarLinks(grupoId, texto, msg) : null));
+    console.log('👂 Ouvindo o grupo: cole um link da Shopee lá e eu devolvo o rascunho.');
+  }
   console.log(`🤖 Robô ligado! Rascunhos às ${config.horarios.join(', ')} (horário de Brasília) no grupo "${config.grupoRascunhos}".`);
 }

@@ -76,3 +76,12 @@ Abra o Termux e cole `./robo.sh` de novo. Só isso.
 | O robô parou sozinho, e o Termux mostra *"Process completed (signal 9)"* | O Android encerrou o Termux. Confira a PARTE 2. Se continuar, em **Configurações → Opções do desenvolvedor**, ative **"Desativar restrições de processos filhos"** (se existir no seu tablet). |
 | Não chegou rascunho num horário | O tablet estava desligado ou sem internet naquela hora. Na próxima rodada volta ao normal. |
 | Chegou só nome, preço e link | O Claude não conseguiu escrever naquela rodada (limite do plano, ou o Claude Code não funcionou no tablet). Me chame. |
+
+## Mandar links para o robô (ofertas relâmpago e outras)
+Com o robô ligado (`./robo.sh`), **cole um link da Shopee no grupo Crônicas da Milla**:
+- **Link de um produto** → o robô responde com o rascunho pronto, já com o seu link de afiliada.
+  Pode colar vários links numa mensagem só.
+- Escreva **"relâmpago"** junto com os links → as mensagens saem como oferta relâmpago ⚡.
+- **Link de uma lista** (aba de ofertas relâmpago da loja, página da loja, cupom) → o robô responde com
+  uma mensagem curta e o **seu link de afiliada para a lista inteira**.
+- Produto de loja que não está na lista autorizada → o robô avisa e não faz o rascunho.

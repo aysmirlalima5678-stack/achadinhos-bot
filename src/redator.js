@@ -26,13 +26,15 @@ Priorize qualidade em vez de quantidade: poucas ofertas boas valem mais que muit
 - Explique os benefícios de forma clara e útil, sem exagero.
 - Use exatamente o preço e o link informados. Nunca escreva "preço a confirmar". Não compare com preços de outras lojas: você não tem esses dados.
 
-## Formato da mensagem (nesta ordem) — CURTA E DIRETA
-1. Chamada inicial curta (no máximo 8 palavras) destacando o diferencial específico do produto, que desperte curiosidade. Nunca genérica (nada de "OFERTA K-BEAUTY").
-2. Nome do produto com um coração. Use um nome curto e limpo: tire do nome da Shopee códigos, "[OFFICIAL]", listas de tamanhos e repetições.
-3. Introdução de 1 a 2 linhas curtas (no máximo 25 palavras): o que é e para que serve.
-4. 3 benefícios bem curtos (no máximo 5 palavras cada), um por linha, com emoji.
-5. *Ativos:* em UMA linha, só os 2 a 4 mais importantes, separados por vírgula.
-6. *Ideal para:* em UMA linha curta (no máximo 10 palavras).
+## Formato da mensagem (nesta ordem)
+1. Chamada inicial curta destacando o diferencial específico do produto, que desperte curiosidade. Nunca genérica (nada de "OFERTA K-BEAUTY").
+2. Nome do produto com um coração. Use um nome limpo: tire do nome da Shopee códigos, "[OFFICIAL]", listas de tamanhos e repetições.
+3. Introdução explicando o que é, para que serve e o diferencial. O TAMANHO DEPENDE DO PRODUTO:
+   - Produto simples (fórmula básica, poucos ativos): 1 a 2 linhas.
+   - Produto com diferencial (tecnologia patenteada, ativo especial, sucesso de vendas na Coreia, lançamento): 2 a 3 linhas, explicando esse diferencial de forma útil.
+4. Benefícios curtos, um por linha, com emoji: de 2 a 4, conforme o produto (simples = 2 ou 3; mais completo = 3 ou 4). Não encha linha à toa.
+5. *Ativos principais:* em uma linha, só os 2 a 5 mais importantes.
+6. *Ideal para:* em uma linha curta e direta (no máximo 8 palavras).
 7. Preço e link exatamente assim:
 💰 Por: R$ XX,XX
 👇 Aproveite aqui:
@@ -41,11 +43,11 @@ Priorize qualidade em vez de quantidade: poucas ofertas boas valem mais que muit
    NUNCA diga que os impostos estão inclusos: o preço informado é o do anúncio, e o imposto é somado no carrinho.
 9. Opcional: avisar que o preço pode mudar a qualquer momento.
 
-A mensagem inteira deve caber numa tela de celular (cerca de 12 a 16 linhas). Prefira cortar palavras a cortar seções: nunca tire "Ativos" nem "Ideal para".
+Seja enxuta: corte palavras desnecessárias, mas nunca tire "Ativos principais" nem "Ideal para".
 
 ## Estilo
 - Tom feminino, natural, empolgado e informal, com emojis.
-- Para falar com o grupo, use "meninas" ou "amigas". Evite "conversa entre amigas" quando soar artificial.
+- NÃO comece as mensagens chamando o grupo ("meninas", "amigas"). Fale do produto direto. Só use "meninas" ou "amigas" de vez em quando, numa mensagem ou outra, quando soar natural; nunca como padrão.
 - NUNCA repita o mesmo emoji na mesma mensagem, incluindo chamada e nome do produto (atenção: 💰, 👇 e ✈️ já são usados no fim, não use de novo).
 - Mensagem curta e organizada, mas não exageradamente dividida em blocos.
 - Nunca tire "Ativos principais" nem "Ideal para".
@@ -142,8 +144,8 @@ async function viaApi(system, entrada, modelo) {
 /**
  * Recebe os candidatos e devolve [{ produto, motivo, mensagem }].
  */
-export async function escolherEEscrever(candidatos, { maximo, modelo, modo }) {
-  const system = REGRAS.replace('{{MAX}}', String(maximo));
+export async function escolherEEscrever(candidatos, { maximo, modelo, modo, extra = '' }) {
+  const system = REGRAS.replace('{{MAX}}', String(maximo)) + (extra ? `\n\n${extra}` : '');
   const entrada = montarEntrada(candidatos);
   const saida = modo === 'api'
     ? await viaApi(system, entrada, modelo)
@@ -154,4 +156,18 @@ export async function escolherEEscrever(candidatos, { maximo, modelo, modo }) {
     .filter((e) => porId.has(e.itemId))
     .slice(0, maximo)
     .map((e) => ({ produto: porId.get(e.itemId), motivo: e.motivo, mensagem: e.mensagem }));
+}
+
+/**
+ * Modo manual: ela mandou o link no grupo, então o produto JÁ FOI ESCOLHIDO.
+ * Só escreve a mensagem (não descarta).
+ */
+export async function escreverEscolhidos(produtos, { modelo, modo, relampago = false }) {
+  let extra = `## Modo manual (IMPORTANTE)
+A Aysmirla JÁ ESCOLHEU estes produtos. Escreva a mensagem de TODOS eles: não descarte nenhum e ignore o critério de escolha.
+Continua proibido inventar: se não souber com segurança os ativos de algum produto, use em "Ativos principais" só o que aparece no nome do produto.`;
+  if (relampago) {
+    extra += `\nEstes produtos estão em OFERTA RELÂMPAGO (por tempo limitado): comece a chamada com ⚡ e deixe claro que é relâmpago.`;
+  }
+  return escolherEEscrever(produtos, { maximo: produtos.length, modelo, modo, extra });
 }
