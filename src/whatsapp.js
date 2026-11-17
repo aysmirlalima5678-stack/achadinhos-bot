@@ -14,6 +14,8 @@ let pronto = false;
 let jaPediuCodigo = false; // pede o código só uma vez por execução
 let aoReceber = null; // função chamada quando chega mensagem de texto
 let aoGuardar = null; // função que guarda mensagens de grupo na memória (histórico e novas)
+let qrMostrado = false;
+let quedasSemQR = 0;
 
 /**
  * No WhatsApp, celulares brasileiros com DDD 31 ou maior costumam ser registrados
@@ -83,6 +85,7 @@ export function conectar() {
           console.log('Conectar um aparelho > "Conectar com número de telefone" e digite o código.');
           console.log('⚠️  Digite o código NO CELULAR do número do robô, não aqui no tablet.\n');
         } else if (!numero || modoQR) {
+          qrMostrado = true;
           console.log('\nNo celular do robô: WhatsApp > Dispositivos conectados > Conectar um dispositivo,');
           console.log('e aponte a câmera para este QR Code:\n');
           qrcode.generate(qr, { small: true });
@@ -105,7 +108,13 @@ export function conectar() {
           console.log('   Já limpei a tentativa anterior. Rode o comando de novo para gerar um código novo.');
           process.exit(1);
         }
-        console.log('🔄 Conexão caiu, reconectando...');
+        console.log(`🔄 Conexão caiu (código ${codigo ?? '?'}), reconectando...`);
+        // Se o modo QR ("computador") não for aceito, passa a usar o código de 8 letras
+        if (modoQR && !qrMostrado && ++quedasSemQR >= 2) {
+          process.env.MODO_QR = '0';
+          fs.rmSync('sessao-whatsapp', { recursive: true, force: true });
+          console.log('↪️  O modo QR não funcionou. Vou usar o código de 8 letras (o histórico também é pedido).');
+        }
         setTimeout(() => conectar().then(resolve), 3000);
       }
     });
