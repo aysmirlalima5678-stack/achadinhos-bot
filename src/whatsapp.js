@@ -5,16 +5,17 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
+import fs from 'node:fs';
 import pino from 'pino';
 
 let sock = null;
 let pronto = false;
+let jaPediuCodigo = false; // pede o código só uma vez por execução
 
 export function conectar() {
   return new Promise(async (resolve) => {
     const { state, saveCreds } = await useMultiFileAuthState('sessao-whatsapp');
     const { version } = await fetchLatestBaileysVersion();
-    let pediuCodigo = false;
 
     sock = makeWASocket({
       version,
@@ -29,16 +30,17 @@ export function conectar() {
     sock.ev.on('connection.update', async (u) => {
       const { connection, lastDisconnect, qr } = u;
 
-      if (qr && !state.creds.registered) {
+      if (qr && !state.creds.registered && !state.creds.me) {
         const numero = (process.env.WHATSAPP_NUMERO || '').replace(/\D/g, '');
-        if (numero && !pediuCodigo) {
-          pediuCodigo = true;
+        if (numero && !jaPediuCodigo) {
+          jaPediuCodigo = true;
           const codigo = await sock.requestPairingCode(numero);
           console.log('\n==============================================');
           console.log(`  CÓDIGO PARA CONECTAR O WHATSAPP:  ${codigo}`);
           console.log('==============================================');
           console.log('No celular: WhatsApp > Configurações > Aparelhos conectados >');
-          console.log('Conectar um aparelho > "Conectar com número de telefone" e digite o código.\n');
+          console.log('Conectar um aparelho > "Conectar com número de telefone" e digite o código.');
+          console.log('⚠️  Digite o código NO CELULAR do número do robô, não aqui no tablet.\n');
         } else if (!numero) {
           console.log('\nEscaneie este QR Code no WhatsApp (Aparelhos conectados > Conectar um aparelho):\n');
           qrcode.generate(qr, { small: true });
@@ -55,7 +57,10 @@ export function conectar() {
         pronto = false;
         const codigo = lastDisconnect?.error?.output?.statusCode;
         if (codigo === DisconnectReason.loggedOut) {
-          console.log('❌ O WhatsApp foi desconectado pelo celular. Apague a pasta "sessao-whatsapp" e conecte de novo.');
+          // Limpa a conexão antiga para a próxima tentativa começar do zero
+          fs.rmSync('sessao-whatsapp', { recursive: true, force: true });
+          console.log('❌ O WhatsApp não aceitou a conexão (ou foi desconectado pelo celular).');
+          console.log('   Já limpei a tentativa anterior. Rode o comando de novo para gerar um código novo.');
           process.exit(1);
         }
         console.log('🔄 Conexão caiu, reconectando...');
