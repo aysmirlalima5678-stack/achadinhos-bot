@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import cron from 'node-cron';
 import { buscarProdutos, resolverLoja } from './shopee.js';
 import { conectar, acharGrupo, enviar } from './whatsapp.js';
-import { redatorAtivo, escolherEEscrever } from './redator.js';
+import { modoRedator, escolherEEscrever } from './redator.js';
 
 const FUSO = 'America/Sao_Paulo';
 const ARQ_ENVIADOS = 'enviados.json';
@@ -83,12 +83,18 @@ async function prepararMensagens(config) {
   if (!candidatos.length) return [];
   const max = config.filtros.maximoPorRodada;
 
-  if (redatorAtivo()) {
-    const escolhidos = await escolherEEscrever(candidatos, { maximo: max, modelo: config.modeloClaude });
-    escolhidos.forEach((e) => console.log(`   ✔ ${e.produto.productName.slice(0, 60)} — ${e.motivo}`));
-    return escolhidos;
+  const modo = modoRedator(config);
+  if (modo !== 'simples') {
+    try {
+      const escolhidos = await escolherEEscrever(candidatos, { maximo: max, modelo: config.modeloClaude, modo });
+      escolhidos.forEach((e) => console.log(`   ✔ ${e.produto.productName.slice(0, 60)}: ${e.motivo}`));
+      return escolhidos;
+    } catch (e) {
+      // Ex.: limite do plano esgotado. Não fica sem nada: manda a versão simples.
+      console.log(`⚠️  O Claude não conseguiu escrever agora (${e.message}). Mandando a versão simples.`);
+    }
   }
-  // Sem Claude: pega os de maior desconto e usa a mensagem simples
+  // Versão simples: pega os de maior desconto, só com nome, preço e link
   return candidatos
     .sort((a, b) => Number(b.priceDiscountRate || 0) - Number(a.priceDiscountRate || 0))
     .slice(0, max)

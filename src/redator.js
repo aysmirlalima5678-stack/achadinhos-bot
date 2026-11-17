@@ -1,5 +1,7 @@
 // O "redator": o Claude escolhe as melhores ofertas e escreve as mensagens
 // seguindo as regras do projeto Alerta K-Beauty.
+import { spawn } from 'node:child_process';
+import os from 'node:os';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
@@ -57,18 +59,17 @@ const Resposta = z.object({
   ),
 });
 
-let cliente = null;
-
-export function redatorAtivo() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+/**
+ * Qual "cérebro" escreve as mensagens:
+ *  - "assinatura": Claude Code instalado no servidor, logado na conta dela (sem custo extra)
+ *  - "api": API paga do Claude (precisa de ANTHROPIC_API_KEY no .env)
+ *  - "simples": sem Claude, só nome, preço e link
+ */
+export function modoRedator(config) {
+  return config.redator || 'assinatura';
 }
 
-/**
- * Recebe os candidatos e devolve [{ produto, motivo, mensagem }].
- */
-export async function escolherEEscrever(candidatos, { maximo, modelo }) {
-  cliente ??= new Anthropic();
-
+function montarEntrada(candidatos) {
   const lista = candidatos.map((p) => ({
     itemId: String(p.itemId),
     nome: p.productName,
@@ -79,26 +80,74 @@ export async function escolherEEscrever(candidatos, { maximo, modelo }) {
     vendidos: p.sales,
     link: p.offerLink,
   }));
+  return `Produtos candidatos de hoje (JSON):\n${JSON.stringify(lista, null, 2)}`;
+}
 
+// ---- Modo "assinatura": chama o Claude Code (claude -p) no servidor ----
+function viaAssinatura(system, entrada, modelo) {
+  const { $schema, ...semVersao } = z.toJSONSchema(Resposta);
+  const schema = JSON.stringify(semVersao);
+  const args = [
+    '-p',
+    '--output-format', 'json',
+    '--json-schema', schema,
+    '--system-prompt', system,
+    '--tools', '',
+    '--no-session-persistence',
+    '--model', modelo,
+  ];
+  return new Promise((resolve, reject) => {
+    // roda numa pasta neutra, para não misturar com arquivos do projeto
+    const proc = spawn('claude', args, { cwd: os.tmpdir(), timeout: 10 * 60 * 1000 });
+    let out = '', err = '';
+    proc.stdout.on('data', (d) => (out += d));
+    proc.stderr.on('data', (d) => (err += d));
+    proc.on('error', (e) => reject(new Error(`Claude Code não encontrado no servidor (${e.message}). Veja o PASSO 5B do guia.`)));
+    proc.on('close', () => {
+      try {
+        const r = JSON.parse(out);
+        if (r.is_error || !r.structured_output) {
+          return reject(new Error(`Claude Code: ${String(r.result || r.subtype).slice(0, 300)}`));
+        }
+        resolve(r.structured_output);
+      } catch {
+        reject(new Error(`Claude Code não respondeu direito: ${(err || out).slice(0, 300)}`));
+      }
+    });
+    proc.stdin.end(entrada);
+  });
+}
+
+// ---- Modo "api": API paga ----
+let cliente = null;
+async function viaApi(system, entrada, modelo) {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('Falta ANTHROPIC_API_KEY no .env');
+  cliente ??= new Anthropic();
   const resp = await cliente.messages.parse({
     model: modelo,
     max_tokens: 16000,
     output_config: { effort: 'medium', format: zodOutputFormat(Resposta) },
-    system: REGRAS.replace('{{MAX}}', String(maximo)),
-    messages: [
-      {
-        role: 'user',
-        content: `Produtos candidatos de hoje (JSON):\n${JSON.stringify(lista, null, 2)}`,
-      },
-    ],
+    system,
+    messages: [{ role: 'user', content: entrada }],
   });
-
   if (resp.stop_reason === 'refusal' || !resp.parsed_output) {
     throw new Error(`O Claude não conseguiu responder (${resp.stop_reason})`);
   }
+  return resp.parsed_output;
+}
+
+/**
+ * Recebe os candidatos e devolve [{ produto, motivo, mensagem }].
+ */
+export async function escolherEEscrever(candidatos, { maximo, modelo, modo }) {
+  const system = REGRAS.replace('{{MAX}}', String(maximo));
+  const entrada = montarEntrada(candidatos);
+  const saida = modo === 'api'
+    ? await viaApi(system, entrada, modelo)
+    : await viaAssinatura(system, entrada, modelo);
 
   const porId = new Map(candidatos.map((p) => [String(p.itemId), p]));
-  return resp.parsed_output.escolhidos
+  return (saida.escolhidos || [])
     .filter((e) => porId.has(e.itemId))
     .slice(0, maximo)
     .map((e) => ({ produto: porId.get(e.itemId), motivo: e.motivo, mensagem: e.mensagem }));

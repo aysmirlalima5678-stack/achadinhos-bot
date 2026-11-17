@@ -8,6 +8,8 @@ if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 2
 fi
 echo ">> Instalando o gerenciador que mantém o robô ligado (pm2)..."
 sudo npm install -g pm2
+echo ">> Instalando o Claude Code (quem escreve as mensagens)..."
+sudo npm install -g @anthropic-ai/claude-code
 echo ">> Instalando o robô..."
 npm install --omit=dev
 [ -f .env ] || cp .env.example .env

@@ -4,7 +4,7 @@ O que ele faz: em horários definidos, ele busca ofertas **só nas lojas autoriz
 
 🔒 O robô tem uma trava: ele **nunca** manda nada no grupo Alerta K-Beauty.
 
-**Custo:** a Shopee e o servidor da Oracle são grátis. A parte que escreve as mensagens no seu estilo usa a API do Claude, que é paga por uso (veja o PASSO 1B). Sem ela, o robô funciona, mas manda só nome, preço e link.
+**Custo: R$ 0 a mais.** A Shopee e o servidor da Oracle são grátis, e quem escreve as mensagens é o Claude Code logado na **sua assinatura do Claude** (PASSO 5B). Isso gasta o limite de uso do seu plano, o mesmo que você usa nas conversas. Se o limite acabar em alguma rodada, o robô manda a versão simples (nome, preço e link).
 
 ---
 
@@ -23,11 +23,6 @@ O que ele faz: em horários definidos, ele busca ofertas **só nas lojas autoriz
 4. Quando for aprovado, aparecem dois códigos: **App ID** e **Secret** (ou "Senha"). Guarde os dois.
 
 > Enquanto espera a aprovação, você já pode fazer os passos 2 a 4.
-
-## PASSO 1B (opcional, mas recomendado): Chave do Claude, para escrever no seu estilo
-1. Entre em **platform.claude.com** e crie uma conta.
-2. Em **Billing**, coloque um cartão e um crédito pequeno (US$ 5 já dura bastante).
-3. Em **API Keys**, clique em **Create Key** e guarde a chave (começa com `sk-ant-`).
 
 ## PASSO 2: Criar o servidor grátis na Oracle (30 min)
 1. Entre em **oracle.com/cloud/free** e clique em **"Start for free"**.
@@ -63,9 +58,21 @@ Preencha assim, usando os seus dados:
 SHOPEE_APP_ID=12345678
 SHOPEE_SECRET=ABCDEF...
 WHATSAPP_NUMERO=5511999998888
-ANTHROPIC_API_KEY=sk-ant-...
 ```
 Para salvar: **Ctrl+O**, depois **Enter**, depois **Ctrl+X**.
+
+## PASSO 5B: Conectar o Claude na sua conta (uma vez só)
+Cole:
+```bash
+claude
+```
+1. Se ele perguntar sobre tema ou sobre confiar na pasta, só aperte **Enter**.
+2. Escolha entrar com a **conta do Claude (assinatura)**.
+3. Ele mostra um **link**: copie, abra no navegador do celular ou do computador e faça login com a sua conta.
+4. O site mostra um **código**: copie, cole de volta na tela preta e aperte Enter.
+5. Quando aparecer a tela de conversa, digite `/exit` e aperte Enter.
+
+Pronto, o robô já consegue usar o Claude.
 
 ## PASSO 6: Conferir as configurações
 Cole:
@@ -78,7 +85,8 @@ Outras coisas que dá para mudar:
 - `"horarios"`: quando ele manda os rascunhos
 - `"maximoPorRodada"`: quantas ofertas, no máximo, por vez (pode ser menos, porque ele prioriza qualidade)
 - `"precoMaximo"` e `"notaMinima"`
-- `"modeloClaude"`: `claude-opus-5-5` (escreve melhor) ou `claude-haiku-5-5` (bem mais barato)
+- `"modeloClaude"`: `claude-opus-5-5` (escreve melhor) ou `claude-haiku-5-5` (gasta bem menos do seu limite)
+- `"redator"`: `assinatura` (padrão), `api` (API paga, com `ANTHROPIC_API_KEY` no .env) ou `simples` (sem Claude)
 
 > Ou mais fácil: **me peça e eu mudo para você.**
 
